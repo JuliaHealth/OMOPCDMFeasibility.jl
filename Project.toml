@@ -3,7 +3,15 @@ uuid = "d7c4b303-36e6-42c5-a114-1784c141c4f7"
 authors = ["Kosuri Lakshmi Indu <kosurilindu@gmail.com> and contributors"]
 version = "0.0.1"
 
+[deps]
+FunSQL = "cf6cc811-59f4-4a10-b258-a8547a8f6407"
+HealthBase = "94e1309d-ccf4-42de-905f-515f1d7b1cae"
+OMOPCommonDataModel = "ba65db9e-6590-4054-ab8a-101ed9124986"
+
 [compat]
+FunSQL = "0.15.0"
+HealthBase = "2.0.0"
+OMOPCommonDataModel = "0.1.4"
 julia = "1.10"
 
 [extras]
