@@ -1,0 +1,13 @@
+name = "OMOPCDMFeasibility"
+uuid = "d7c4b303-36e6-42c5-a114-1784c141c4f7"
+authors = ["Kosuri Lakshmi Indu <kosurilindu@gmail.com> and contributors"]
+version = "0.0.1"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
