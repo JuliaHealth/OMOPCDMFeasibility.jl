@@ -51,3 +51,10 @@ function format_number(n)
         return string(Int(round(n)))
     end
 end
+
+function _counter_reducer(sub, funcs)
+    for fun in funcs
+        sub = fun(sub)  
+    end
+    return sub
+end

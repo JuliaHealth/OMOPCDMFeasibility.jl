@@ -4,26 +4,6 @@ using FunSQL:
     FunSQL, Agg, Fun, From, Get, Group, Join, LeftJoin, Select, Where
 
 """
-    _counter_reducer(person_ids, covariate_functions)
-
-Apply a sequence of OMOPCDMCohortCreator covariate functions to person IDs.
-This follows the pattern used in OMOPCDMMetrics for chaining covariate transformations.
-
-# Arguments
-- `person_ids` - Vector of person IDs or intermediate result from previous covariate function
-- `covariate_functions` - Vector of OMOPCDMCohortCreator functions (e.g., GetPatientGender, GetPatientAgeGroup)
-
-# Returns
-- `DataFrame` - Result after applying all covariate functions in sequence
-"""
-function _counter_reducer(sub, funcs)
-    for fun in funcs
-        sub = fun(sub)  
-    end
-    return sub
-end
-
-"""
     scan_patients_with_concepts(
         conn;
         domain::Symbol,
@@ -60,7 +40,13 @@ df = scan_patients_with_concepts(
 )
 ```
 """
-function scan_patients_with_concepts(conn; domain::Symbol, concept_set::Vector{<:Integer}, covariate_funcs::AbstractVector{<:Function}=Function[], schema::String="dbt_synthea_dev")
+function scan_patients_with_concepts(
+    conn; 
+    domain::Symbol, 
+    concept_set::Vector{<:Integer}, 
+    covariate_funcs::AbstractVector{<:Function}=Function[], 
+    schema::String="dbt_synthea_dev"
+    )
     setup = _setup_domain_query(conn; domain=domain, schema=schema)
     
     base = From(setup.tbl) |> 
@@ -119,7 +105,13 @@ df = analyze_concept_distribution(
 )
 ```
 """
-function analyze_concept_distribution(conn; domain::Symbol, concept_set::Vector{<:Integer}=Int[], covariate_funcs::AbstractVector{<:Function}=Function[], schema::String="dbt_synthea_dev")
+function analyze_concept_distribution(
+    conn; 
+    domain::Symbol, 
+    concept_set::Vector{<:Integer}=Int[], 
+    covariate_funcs::AbstractVector{<:Function}=Function[], 
+    schema::String="dbt_synthea_dev"
+    )
     setup = _setup_domain_query(conn; domain=domain, schema=schema)
 
     base = From(setup.tbl) |> Join(:main_concept => setup.concept_table, Get(setup.concept_col) .== Get.main_concept.concept_id)
@@ -191,7 +183,13 @@ report = generate_feasibility_report(
 )
 ```
 """
-function generate_feasibility_report(conn; domain::Symbol, concept_set::Vector{<:Integer}, covariate_funcs::AbstractVector{<:Function}=Function[], schema::String="dbt_synthea_dev")
+function generate_feasibility_report(
+    conn; 
+    domain::Symbol, 
+    concept_set::Vector{<:Integer}, 
+    covariate_funcs::AbstractVector{<:Function}=Function[], 
+    schema::String="dbt_synthea_dev"
+    )
     setup = _setup_domain_query(conn; domain=domain, schema=schema)
     
     person_table = _resolve_table(setup.fconn, :person)
