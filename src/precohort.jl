@@ -1,199 +1,151 @@
 using DataFrames
 using DuckDB
 using PrettyTables
+using DBInterface
 using FunSQL:
     FunSQL, Agg, Append, As, Asc, Bind, CrossJoin, Define, Desc, Fun, From, Get, Group, Highlight, Iterate, Join, LeftJoin, Limit, Lit, Order, Partition, Select, Sort, Var, Where, With, WithExternal, render, reflect
 
-include("conceptsets.jl")
+"""
+    _counter_reducer(person_ids, covariate_functions)
 
-function _execute_query(conn, tables, query)
-    sql = render(tables, query)
-    return DBInterface.execute(conn, sql) |> DataFrame
+Apply a sequence of OMOPCDMCohortCreator covariate functions to person IDs.
+This follows the pattern used in OMOPCDMMetrics for chaining covariate transformations.
+
+# Arguments
+- `person_ids` - Vector of person IDs or intermediate result from previous covariate function
+- `covariate_functions` - Vector of OMOPCDMCohortCreator functions (e.g., GetPatientGender, GetPatientAgeGroup)
+
+# Returns
+- `DataFrame` - Result after applying all covariate functions in sequence
+"""
+function _counter_reducer(sub, funcs)
+    for fun in funcs
+        sub = fun(sub)  
+    end
+    return sub
 end
 
-function _get_table_reflection(conn, domain)
-    tbl_name = domain_to_table(domain)
-    tables = reflect(conn; schema = "dbt_synthea_dev", dialect = :postgresql)
-    table = tables[tbl_name]
-    concept_col = domain_to_concept_column(domain)
-    return tables, table, concept_col
-end
+"""
+    scan_patients_with_concepts(
+        conn;
+        domain::Symbol,
+        concept_set::Vector{<:Integer},
+        covariate_funcs::AbstractVector{<:Function} = Function[],
+        schema::String = "dbt_synthea_dev"
+    )
 
-function lookup_concept(conn; concept_id::Int)
-    tables = reflect(conn; schema = "dbt_synthea_dev", dialect = :postgresql)
-    concept_table = tables[:concept]
+Scan for patients who have specific medical concepts and optionally apply demographic covariates.
+
+# Arguments
+- `conn` - Database connection using DBInterface
+- `domain` - Medical domain symbol (e.g., `:condition_occurrence`, `:drug_exposure`, `:procedure_occurrence`)
+- `concept_set` - Vector of OMOP concept IDs to search for; must be subtype of `Integer`
+
+# Keyword Arguments
+- `covariate_funcs` - Vector of OMOPCDMCohortCreator functions to apply (e.g., `GetPatientGender`, `GetPatientAgeGroup`). Default: `Function[]`
+- `schema` - Database schema name. Default: `"dbt_synthea_dev"`
+
+# Returns
+- `DataFrame` - Patient-level data with columns: `person_id`, `concept_id`, `concept_name`, and any covariate columns from applied functions
+
+# Examples
+```julia
+# Basic usage - find patients with specific conditions
+df = scan_patients_with_concepts(conn; domain=:condition_occurrence, concept_set=[31967, 4059650])
+
+# With demographic covariates
+df = scan_patients_with_concepts(
+    conn;
+    domain=:condition_occurrence, 
+    concept_set=[31967, 4059650],
+    covariate_funcs=[occ.GetPatientGender, occ.GetPatientAgeGroup]
+)
+```
+"""
+function scan_patients_with_concepts(conn; domain::Symbol, concept_set::Vector{<:Integer}, covariate_funcs::AbstractVector{<:Function}=Function[], schema::String="dbt_synthea_dev")
+    setup = _setup_domain_query(conn; domain=domain, schema=schema)
     
-    query = From(concept_table) |>
-        Where(Get(:concept_id) .== concept_id) |>
-        Select(Get(:concept_id), Get(:concept_name), Get(:domain_id), Get(:vocabulary_id), Get(:concept_class_id))
+    base = From(setup.tbl) |> 
+           Join(:main_concept => setup.concept_table, Get(setup.concept_col) .== Get.main_concept.concept_id) |>
+           Where(Fun.in(Get(setup.concept_col), concept_set...))
     
-    df = _execute_query(conn, tables, query)
+    q = base |> Select(Get(:person_id), :concept_id => Get(setup.concept_col), :concept_name => Get.main_concept.concept_name)
+    base_df = DataFrame(DBInterface.execute(setup.fconn, q))
     
-    if nrow(df) == 0
-        println("No concept found with ID: $concept_id")
-        return nothing
+    if isempty(covariate_funcs)
+        return base_df
     end
     
-    println("\nCONCEPT LOOKUP RESULTS\n")
-    println("Search: ID: $concept_id")
-    println("Found $(nrow(df)) concept(s):")
-    println()
+    _funcs = [Base.Fix2(fun, conn) for fun in covariate_funcs]
+    person_ids = unique(base_df.person_id)
+    covariate_df = _counter_reducer(person_ids, _funcs)
+    result_df = leftjoin(base_df, covariate_df, on=:person_id)
     
-    pretty_table(df,
-        header=["Concept ID", "Concept Name", "Domain", "Vocabulary", "Class"],
-        alignment=[:r, :l, :l, :l, :l],
-        crop=:none,
-        title="Concept Search Results",
-        title_alignment=:c)
-    
-    return df
+    return result_df
 end
 
-function scan_domain_presence(conn; domain::Symbol, concept_set::Vector{<:Integer}, limit::Int=10)
-    println("SCAN: Finding patients who have specific medical concepts")
-    println("TARGET: Domain = $(uppercase(string(domain))), Concept IDs = $(concept_set)")
-    println()
-    
-    tables, table, concept_col = _get_table_reflection(conn, domain)
+"""
+    analyze_concept_distribution(
+        conn;
+        domain::Symbol,
+        concept_set::Vector{<:Integer} = Int[],
+        covariate_funcs::AbstractVector{<:Function} = Function[],
+        schema::String = "dbt_synthea_dev"
+    )
 
-    concept_table = tables[:concept]
-    query = From(table) |>
-        Define(:concept_id => Get(concept_col)) |> 
-        Where(Fun.in(Get(:concept_id), map(Lit, concept_set)...)) |>
-        Join(:concept => concept_table, Get(:concept_id) .== Get.concept.concept_id) |>
-        Select(Get(:person_id), Get(:concept_id), :concept_name => Get.concept.concept_name) |>
-        Limit(limit)
+Analyze the distribution of medical concepts across patient demographics by aggregating patient counts.
 
-    df = _execute_query(conn, tables, query)
-    
-    total_query = From(table) |>
-        Define(:concept_id => Get(concept_col)) |>
-        Where(Fun.in(Get(:concept_id), map(Lit, concept_set)...)) |>
-        Group() |>
-        Select(:total_records => Agg.count())
-    
-    summary_df = _execute_query(conn, tables, total_query)
-    
-    unique_patients_query = From(table) |>
-        Define(:concept_id => Get(concept_col)) |>
-        Where(Fun.in(Get(:concept_id), map(Lit, concept_set)...)) |>
-        Group(Get(:person_id)) |>
-        Group() |>
-        Select(:unique_patients => Agg.count())
-    
-    unique_patients_df = _execute_query(conn, tables, unique_patients_query)
-    
-    total_records = summary_df.total_records[1]
-    unique_patients = unique_patients_df.unique_patients[1]
-    records_per_patient = total_records > 0 ? round(total_records / unique_patients, digits=2) : 0.0
-    
-    println("SCAN RESULTS FOR CONCEPTS $(concept_set) IN $(uppercase(string(domain))):")
-    println("-" ^ 60)
-    println("Total Medical Records: $(format_number(total_records)) records contain these concepts")
-    println("Different Patients: $(format_number(unique_patients)) patients have these concepts")
-    println("Average per Patient: $(records_per_patient) times per patient on average")
-    if unique_patients > 0
-        println("Population Coverage: $(round((unique_patients / _get_total_patients(conn, tables)) * 100, digits=2))% of all patients have these concepts")
-    end
-    println()
-    
-    if nrow(df) > 0
-        println("SAMPLE PATIENT DATA (First $(min(limit, nrow(df))) records):")
-        pretty_table(df, 
-            header=["Patient ID", "Concept ID", "Medical Concept Name"],
-            alignment=[:r, :r, :l],
-            crop=:none,
-            title="Which Patients Have These Medical Concepts",
-            title_alignment=:c)
-    else
-        println("NO PATIENTS FOUND: No patients have these concept IDs in their medical records")
+# Arguments
+- `conn` - Database connection using DBInterface
+- `domain` - Medical domain symbol (e.g., `:condition_occurrence`, `:drug_exposure`)
+
+# Keyword Arguments
+- `concept_set` - Vector of OMOP concept IDs to filter by; if empty, includes all concepts in domain. Default: `Int[]`
+- `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic stratification. Default: `Function[]`
+- `schema` - Database schema name. Default: `"dbt_synthea_dev"`
+
+# Returns
+- `DataFrame` - Summary statistics with columns for concept information, covariate values, and patient counts (`n`)
+
+# Examples
+```julia
+# Basic concept summary
+df = analyze_concept_distribution(conn; domain=:condition_occurrence, concept_set=[31967, 4059650])
+
+# Demographic breakdown
+df = analyze_concept_distribution(
+    conn;
+    domain=:condition_occurrence,
+    concept_set=[31967, 4059650], 
+    covariate_funcs=[occ.GetPatientGender, occ.GetPatientAgeGroup]
+)
+```
+"""
+function analyze_concept_distribution(conn; domain::Symbol, concept_set::Vector{<:Integer}=Int[], covariate_funcs::AbstractVector{<:Function}=Function[], schema::String="dbt_synthea_dev")
+    setup = _setup_domain_query(conn; domain=domain, schema=schema)
+
+    base = From(setup.tbl) |> Join(:main_concept => setup.concept_table, Get(setup.concept_col) .== Get.main_concept.concept_id)
+    if !isempty(concept_set)
+        base = base |> Where(Fun.in(Get(setup.concept_col), concept_set...))
     end
     
-    return nothing
-end
-
-function _get_total_patients(conn, tables)
-    person_table = tables[:person]
-    query = From(person_table) |> Group() |> Select(:total => Agg.count())
-    result = _execute_query(conn, tables, query)
-    return result.total[1]
-end
-
-function summarize_domain_availability(conn; domain::Symbol, top_n::Int=10)
-    println("SUMMARY: Analyzing most common medical concepts in database")
-    println("DOMAIN: $(uppercase(string(domain))) (medical $(lowercase(string(domain))))")
-    println()
+    q = base |> Select(Get(:person_id), :concept_id => Get(setup.concept_col), :concept_name => Get.main_concept.concept_name)
+    base_df = DataFrame(DBInterface.execute(setup.fconn, q))
     
-    tables, table, concept_col = _get_table_reflection(conn, domain)
-
-    concept_table = tables[:concept]
-    query = From(table) |>
-        Define(:concept_id => Get(concept_col)) |> 
-        Group(Get(:concept_id)) |>
-        Select(Get(:concept_id), :n_records => Agg.count()) |>
-        Join(:concept => concept_table, Get(:concept_id) .== Get.concept.concept_id) |>
-        Select(Get(:concept_id), :concept_name => Get.concept.concept_name, Get(:n_records)) |>
-        Order(Get(:n_records) |> Desc()) |>
-        Limit(top_n)
-
-    df = _execute_query(conn, tables, query)
-    
-    total_query = From(table) |>
-        Group() |>
-        Select(:total_records => Agg.count())
-    
-    unique_concepts_query = From(table) |>
-        Define(:concept_id => Get(concept_col)) |>
-        Group(Get(:concept_id)) |>
-        Group() |>
-        Select(:unique_concepts => Agg.count())
-    
-    summary_df = _execute_query(conn, tables, total_query)
-    unique_concepts_df = _execute_query(conn, tables, unique_concepts_query)
-    
-    total_records = summary_df.total_records[1]
-    unique_concepts = unique_concepts_df.unique_concepts[1]
-    
-    df.percentage = round.((df.n_records ./ total_records) .* 100, digits=2)
-    
-    total_patients = _get_total_patients(conn, tables)
-    coverage_query = From(table) |>
-        Define(:concept_id => Get(concept_col)) |>
-        Group(Get(:person_id)) |>
-        Group() |>
-        Select(:patients_with_data => Agg.count())
-    
-    coverage_df = _execute_query(conn, tables, coverage_query)
-    patients_with_data = coverage_df.patients_with_data[1]
-    domain_coverage = round((patients_with_data / total_patients) * 100, digits=2)
-
-    println("DATABASE OVERVIEW FOR $(uppercase(string(domain))):")
-    println("-" ^ 60)
-    println("Total Medical Records: $(format_number(total_records)) records in this domain")
-    println("Different Medical Concepts: $(format_number(unique_concepts)) unique concepts exist")
-    println("Patients with Data: $(format_number(patients_with_data)) patients ($(domain_coverage)% of all patients)")
-    println("Average per Patient: $(round(total_records / patients_with_data, digits=2)) records per patient")
-    println("Data Density: $(round(unique_concepts / patients_with_data, digits=5)) concepts per patient")
-    println()
-    println("MOST COMMON CONCEPTS (Top $(top_n) by frequency):")
-    
-    pretty_table(df,
-        header=["Concept ID", "Medical Concept Name", "How Many Times", "Percentage"],
-        alignment=[:r, :l, :r, :r],
-        crop=:none,
-        title="What Medical Concepts Appear Most Often",
-        title_alignment=:c,
-        formatters = ft_printf("%.2f", 4))
-    
-    return nothing
-end
-
-function format_number(n)
-    if n >= 1_000_000
-        return "$(round(n/1_000_000, digits=1))M"
-    elseif n >= 1_000
-        return "$(round(n/1_000, digits=1))K"
-    else
-        return string(n)
+    if isempty(covariate_funcs)
+        summary_df = combine(groupby(base_df, [:concept_id, :concept_name]), nrow => :n)
+        return sort(summary_df, :n, rev=true)
     end
+    
+    _funcs = [Base.Fix2(fun, conn) for fun in covariate_funcs]
+    person_ids = unique(base_df.person_id)
+    covariate_df = _counter_reducer(person_ids, _funcs)
+    
+    result_df = leftjoin(base_df, covariate_df, on=:person_id)
+    
+    group_cols = [col for col in names(result_df) if col != "person_id"]
+    summary_df = combine(groupby(result_df, group_cols), nrow => :n)
+    
+    return sort(summary_df, :n, rev=true)
 end
+
