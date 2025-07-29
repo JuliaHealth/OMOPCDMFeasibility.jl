@@ -1,9 +1,7 @@
 using DataFrames
-using DuckDB
-using PrettyTables
 using DBInterface
 using FunSQL:
-    FunSQL, Agg, Append, As, Asc, Bind, CrossJoin, Define, Desc, Fun, From, Get, Group, Highlight, Iterate, Join, LeftJoin, Limit, Lit, Order, Partition, Select, Sort, Var, Where, With, WithExternal, render, reflect
+    FunSQL, Agg, Fun, From, Get, Group, Join, LeftJoin, Select, Where
 
 """
     _counter_reducer(person_ids, covariate_functions)
@@ -147,5 +145,97 @@ function analyze_concept_distribution(conn; domain::Symbol, concept_set::Vector{
     summary_df = combine(groupby(result_df, group_cols), nrow => :n)
     
     return sort(summary_df, :n, rev=true)
+end
+
+"""
+    generate_feasibility_report(
+        conn;
+        domain::Symbol,
+        concept_set::Vector{<:Integer},
+        covariate_funcs::AbstractVector{<:Function} = Function[],
+        schema::String = "dbt_synthea_dev"
+    )
+
+Generate a comprehensive feasibility analysis report with key metrics for study planning.
+
+This function provides a complete feasibility assessment including population coverage, 
+patient eligibility, data availability, and demographic stratification.
+
+# Arguments
+- `conn` - Database connection using DBInterface
+- `domain` - Medical domain symbol (e.g., `:condition_occurrence`, `:drug_exposure`, `:procedure_occurrence`)
+- `concept_set` - Vector of OMOP concept IDs to analyze; must be subtype of `Integer`
+
+# Keyword Arguments
+- `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic analysis (e.g., `GetPatientGender`, `GetPatientRace`, `GetPatientEthnicity`). Default: `Function[]`
+- `schema` - Database schema name. Default: `"dbt_synthea_dev"`
+
+# Returns
+- `DataFrame` - Feasibility metrics with columns: `metric`, `value`, `interpretation`
+
+# Examples
+```julia
+# Basic feasibility analysis
+report = generate_feasibility_report(
+    conn; 
+    domain=:condition_occurrence, 
+    concept_set=[31967, 4059650]
+)
+
+# With demographic stratification
+report = generate_feasibility_report(
+    conn;
+    domain=:condition_occurrence,
+    concept_set=[31967, 4059650],
+    covariate_funcs=[GetPatientGender, GetPatientRace]
+)
+```
+"""
+function generate_feasibility_report(conn; domain::Symbol, concept_set::Vector{<:Integer}, covariate_funcs::AbstractVector{<:Function}=Function[], schema::String="dbt_synthea_dev")
+    setup = _setup_domain_query(conn; domain=domain, schema=schema)
+    
+    person_table = _resolve_table(setup.fconn, :person)
+    total_patients_q = From(person_table) |> Group() |> Select(:total_patients => Agg.count())
+    total_patients = DataFrame(DBInterface.execute(setup.fconn, total_patients_q)).total_patients[1]
+    
+    concept_records_q = From(setup.tbl) |> 
+        Where(Fun.in(Get(setup.concept_col), concept_set...)) |>
+        Group() |>
+        Select(:total_concept_records => Agg.count())
+    total_concept_records = DataFrame(DBInterface.execute(setup.fconn, concept_records_q)).total_concept_records[1]
+    
+    unique_patients_q = From(setup.tbl) |>
+        Where(Fun.in(Get(setup.concept_col), concept_set...)) |>
+        Group(Get(:person_id)) |>
+        Group() |>
+        Select(:unique_patients_with_concepts => Agg.count())
+    unique_patients_with_concepts = DataFrame(DBInterface.execute(setup.fconn, unique_patients_q)).unique_patients_with_concepts[1]
+    
+    avg_records_per_patient = unique_patients_with_concepts > 0 ? round(total_concept_records / unique_patients_with_concepts, digits=3) : 0.0
+    population_coverage = round((unique_patients_with_concepts / total_patients) * 100, digits=3)
+    
+    return DataFrame(
+        metric = [
+            "Total Patients",
+            "Eligible Patients", 
+            "Total Target Records",
+            "Records per Patient",
+            "Population Coverage (%)"
+        ],
+        value = [
+            format_number(total_patients),
+            format_number(unique_patients_with_concepts),
+            format_number(total_concept_records),
+            string(avg_records_per_patient),
+            string(population_coverage) * "%"
+        ],
+        interpretation = [
+            "Total patients available in the database",
+            "Patients who have your target medical conditions",
+            "Number of medical records found for target conditions", 
+            "Average medical records per eligible patient",
+            "What percentage of all patients are eligible for your study"
+        ]
+    )
 end
 

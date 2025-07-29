@@ -5,7 +5,9 @@ using OMOPCDMCohortCreator:
     GenerateDatabaseDetails, 
     GenerateTables, 
     GetPatientGender, 
-    GetPatientAgeGroup
+    GetPatientAgeGroup,
+    GetPatientRace,
+    GetPatientEthnicity
 
 conn = DBInterface.connect(DuckDB.DB, "synthea_1M_3YR.duckdb")
 
@@ -14,24 +16,32 @@ GenerateTables(conn)
 
 concept_ids = [31967, 4059650]
 
-df1 = OMOPCDMFeasibility.scan_patients_with_concepts(
-    conn; 
-    domain=:condition_occurrence, 
-    concept_set=concept_ids, 
-    covariate_funcs=[GetPatientGender, GetPatientAgeGroup]
-)
-
-println("First 10 patients:")
-display(first(df1, 10))
-
-df2 = OMOPCDMFeasibility.analyze_concept_distribution(
+println("\nFeasibility Report:")
+report = OMOPCDMFeasibility.generate_feasibility_report(
     conn;
     domain=:condition_occurrence,
     concept_set=concept_ids,
-    covariate_funcs=[GetPatientGender, GetPatientAgeGroup]
+    covariate_funcs=[GetPatientGender, GetPatientRace]
 )
+display(report)
 
-println("Summary by concept and covariates:")
-display(df2)
+println("\nPatient Scan (First 10):")
+scan = OMOPCDMFeasibility.scan_patients_with_concepts(
+    conn;
+    domain=:condition_occurrence,
+    concept_set=concept_ids,
+    covariate_funcs=[GetPatientGender, GetPatientRace]
+)
+display(first(scan, 10))
+
+println("\nConcept Distribution Summary:")
+summary = OMOPCDMFeasibility.analyze_concept_distribution(
+    conn;
+    domain=:condition_occurrence,
+    concept_set=concept_ids,
+    covariate_funcs=[GetPatientAgeGroup, GetPatientRace]
+)
+display(summary)
+println()
 
 DBInterface.close!(conn)

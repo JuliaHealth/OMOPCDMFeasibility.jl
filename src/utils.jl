@@ -1,9 +1,6 @@
-using FunSQL: SQLConnection, reflect, Get, Fun, Lit, From, Join, LeftJoin, Where
-using Dates
-using OMOPCDMCohortCreator
+using FunSQL: SQLConnection, reflect
 using OMOPCommonDataModel
 using Serialization
-using InlineStrings
 
 const DOMAIN_TABLE = let
     versions  = deserialize(joinpath(@__DIR__, "..", "assets", "version_info"))
@@ -36,7 +33,6 @@ function _resolve_table(fconn::SQLConnection, tblsym::Symbol)
 end
 
 function _setup_domain_query(conn; domain::Symbol, schema::String="dbt_synthea_dev")
-    """Helper function to reduce repetitive setup code"""
     tblsym = domain_to_table(domain)
     concept_col = _concept_col(tblsym)
     fconn = _funsql(conn; schema=schema)
@@ -44,4 +40,14 @@ function _setup_domain_query(conn; domain::Symbol, schema::String="dbt_synthea_d
     concept_table = _resolve_table(fconn, :concept)
     
     return (fconn=fconn, tbl=tbl, concept_table=concept_table, concept_col=concept_col)
+end
+
+function format_number(n)
+    if n >= 1_000_000
+        return "$(round(n/1_000_000, digits=1))M"
+    elseif n >= 1_000
+        return "$(round(n/1_000, digits=1))K"
+    else
+        return string(Int(round(n)))
+    end
 end
