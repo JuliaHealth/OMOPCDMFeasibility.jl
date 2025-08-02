@@ -1,5 +1,4 @@
 using DataFrames, DuckDB, DBInterface
-using FunSQL: Get
 using OMOPCDMFeasibility
 using OMOPCDMCohortCreator:
     GenerateDatabaseDetails, 
@@ -7,37 +6,31 @@ using OMOPCDMCohortCreator:
     GetPatientGender, 
     GetPatientAgeGroup,
     GetPatientRace,
-    GetPatientEthnicity
+    GetPatientEthnicity,
+    ConditionFilterPersonIDs
 
 conn = DBInterface.connect(DuckDB.DB, "synthea_1M_3YR.duckdb")
 
 GenerateDatabaseDetails(:postgresql, "dbt_synthea_dev")
 GenerateTables(conn)
 
-concept_ids = [31967, 4059650]
-
+concept_ids = [
+    31967,    # Condition: Nausea  
+    1127433,  # Drug: Some medication
+    4044394   # Procedure: Some procedure
+]
+println("\nPre Cohort")
 println("\nFeasibility Report:")
 report = OMOPCDMFeasibility.generate_feasibility_report(
     conn;
-    domain=:condition_occurrence,
     concept_set=concept_ids,
     covariate_funcs=[GetPatientGender, GetPatientRace]
 )
 display(report)
 
-println("\nPatient Scan (First 10):")
-scan = OMOPCDMFeasibility.scan_patients_with_concepts(
-    conn;
-    domain=:condition_occurrence,
-    concept_set=concept_ids,
-    covariate_funcs=[GetPatientGender, GetPatientRace]
-)
-display(first(scan, 10))
-
 println("\nConcept Distribution Summary:")
 summary = OMOPCDMFeasibility.analyze_concept_distribution(
     conn;
-    domain=:condition_occurrence,
     concept_set=concept_ids,
     covariate_funcs=[GetPatientAgeGroup, GetPatientRace]
 )
