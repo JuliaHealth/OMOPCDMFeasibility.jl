@@ -19,9 +19,7 @@ cohort_result = ConditionFilterPersonIDs(diabetes_concept_ids, conn)
 cohort_ids = cohort_result.person_id
 
 sample_cohort = DataFrame(
-    person_id = cohort_ids,
-    cohort_start_date = fill(Date(2020, 1, 1), length(cohort_ids)),
-    cohort_end_date = fill(Date(2020, 12, 31), length(cohort_ids))
+    person_id = cohort_ids
 )
 
 individual_demographics = OMOPCDMFeasibility.create_individual_profiles(
