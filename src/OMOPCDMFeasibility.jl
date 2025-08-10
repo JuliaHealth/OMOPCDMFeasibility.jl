@@ -8,5 +8,7 @@ using OMOPCDMCohortCreator
 include("utils.jl")
 include("postcohort.jl")
 
-export profile_cohort_demographics
+export create_individual_profiles,
+       create_cartesian_profiles
+
 end
