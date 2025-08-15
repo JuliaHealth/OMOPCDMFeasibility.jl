@@ -30,10 +30,8 @@ individual_demographics = OMOPCDMFeasibility.create_individual_profiles(
 
 println("Available individual tables: ", keys(individual_demographics))
 for (name, table) in pairs(individual_demographics)
-    if name != :summary
-        println("\n$name breakdown:")
-        println(table)
-    end
+    println("\n$name breakdown:")
+    println(table)
 end
 
 cartesian_demographics_by_df = OMOPCDMFeasibility.create_cartesian_profiles(
@@ -44,10 +42,8 @@ cartesian_demographics_by_df = OMOPCDMFeasibility.create_cartesian_profiles(
 
 println("Available combination tables (by DataFrame): ", keys(cartesian_demographics_by_df))
 for (name, table) in pairs(cartesian_demographics_by_df)
-    if name != :summary
-        println("\n$name combinations (from cohort_df):")
-        println(first(table, 5))
-    end
+    println("\n$name combinations (from cohort_df):")
+    println(first(table, 5))
 end
 
 DBInterface.close!(conn)

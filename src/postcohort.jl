@@ -30,13 +30,6 @@ function create_individual_profiles(;
         end
     end
     
-    summary_df = DataFrame(
-        metric = ["Cohort Size"],
-        count = [cohort_size],
-        percentage = [100.0]
-    )
-    result_tables[:summary] = summary_df
-    
     return NamedTuple(result_tables)
 end
 
@@ -66,13 +59,6 @@ function create_cartesian_profiles(;
             result_tables[combo_name] = combo_stats
         end
     end
-    
-    summary_df = DataFrame(
-        metric = ["Cohort Size"],
-        count = [cohort_size],
-        percentage = [100.0]
-    )
-    result_tables[:summary] = summary_df
     
     return NamedTuple(result_tables)
 end
