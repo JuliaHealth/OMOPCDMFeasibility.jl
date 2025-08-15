@@ -16,7 +16,7 @@ GenerateTables(conn)
 
 concept_ids = [
     31967,    # Condition: Nausea  
-    1127433,  # Drug: Some medication
+    1127433,  # Drug: Acetaminophen
     4044394   # Procedure: Some procedure
 ]
 println("\nPre Cohort")
