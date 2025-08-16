@@ -22,28 +22,28 @@ sample_cohort = DataFrame(
     person_id = cohort_ids
 )
 
+println("Creating individual demographic profiles...")
 individual_demographics = OMOPCDMFeasibility.create_individual_profiles(
     cohort_df=sample_cohort,
     conn=conn,
     covariate_funcs=[GetPatientGender, GetPatientRace, GetPatientAgeGroup]
 )
 
-println("Available individual tables: ", keys(individual_demographics))
+println("Individual profiles:")
 for (name, table) in pairs(individual_demographics)
-    println("\n$name breakdown:")
+    println("$name:")
     println(table)
+    println()
 end
 
-cartesian_demographics_by_df = OMOPCDMFeasibility.create_cartesian_profiles(
+println("Creating Cartesian demographic profiles...")
+cartesian_demographics = OMOPCDMFeasibility.create_cartesian_profiles(
     cohort_df=sample_cohort,
     conn=conn,
-    covariate_funcs=[GetPatientGender, GetPatientRace, GetPatientAgeGroup]
+    covariate_funcs=[GetPatientAgeGroup, GetPatientGender, GetPatientRace]
 )
 
-println("Available combination tables (by DataFrame): ", keys(cartesian_demographics_by_df))
-for (name, table) in pairs(cartesian_demographics_by_df)
-    println("\n$name combinations (from cohort_df):")
-    println(first(table, 5))
-end
+println("Cartesian profiles:")
+println(cartesian_demographics)
 
 DBInterface.close!(conn)

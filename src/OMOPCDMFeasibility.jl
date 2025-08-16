@@ -3,6 +3,8 @@ __precompile__(false)
 module OMOPCDMFeasibility
 
 using DataFrames
+using DBInterface
+using FunSQL: SQLConnection, reflect, FunSQL, From, Get, Select, Where, Fun
 using OMOPCDMCohortCreator
 
 include("utils.jl")
