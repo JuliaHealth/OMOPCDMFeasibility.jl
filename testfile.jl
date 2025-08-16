@@ -17,10 +17,8 @@ GenerateTables(conn)
 concept_ids = [
     31967,    # Condition: Nausea  
     1127433,  # Drug: Acetaminophen
-    4044394   # Procedure: Some procedure
 ]
-println("\nPre Cohort")
-println("\nFeasibility Report:")
+println("\n")
 report = OMOPCDMFeasibility.generate_feasibility_report(
     conn;
     concept_set=concept_ids,
@@ -28,7 +26,7 @@ report = OMOPCDMFeasibility.generate_feasibility_report(
 )
 display(report)
 
-println("\nConcept Distribution Summary:")
+println("\n")
 summary = OMOPCDMFeasibility.analyze_concept_distribution(
     conn;
     concept_set=concept_ids,

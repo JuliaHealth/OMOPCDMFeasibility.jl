@@ -1,8 +1,3 @@
-using DataFrames
-using DBInterface
-using FunSQL:
-    FunSQL, Agg, Fun, From, Get, Group, Join, LeftJoin, Select, Where
-
 """
     analyze_concept_distribution(
         conn;
@@ -22,7 +17,7 @@ Analyze the distribution of medical concepts across patient demographics by auto
 - `schema` - Database schema name. Default: `"dbt_synthea_dev"`
 
 # Returns
-- `DataFrame` - Summary statistics with columns for concept information, domain, covariate values, and patient counts (`n`)
+- `DataFrame` - Summary statistics with columns for concept information, domain, covariate values, and patient counts (`count`)
 
 # Examples
 ```julia
@@ -44,19 +39,18 @@ function analyze_concept_distribution(
     schema::String="dbt_synthea_dev"
     )
     
-    # Get concepts grouped by domain
+    isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
+    
     concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema)
     
     if isempty(concepts_by_domain)
-        return DataFrame(concept_id=Int[], concept_name=String[], domain=String[], n=Int[])
+        return DataFrame(concept_id=Int[], concept_name=String[], domain=String[], count=Int[])
     end
     
     all_results = DataFrame()
     
-    # Process each domain separately
     for (domain_id, domain_concepts) in concepts_by_domain
         try
-            # Convert domain_id to table symbol
             table_symbol = domain_id_to_table(domain_id)
             
             setup = _setup_domain_query(conn; domain=table_symbol, schema=schema)
@@ -69,11 +63,10 @@ function analyze_concept_distribution(
             base_df = DataFrame(DBInterface.execute(setup.fconn, q))
             
             if !isempty(base_df)
-                # Add domain information
                 base_df.domain = fill(domain_id, nrow(base_df))
                 
                 if isempty(covariate_funcs)
-                    summary_df = combine(groupby(base_df, [:concept_id, :concept_name, :domain]), nrow => :n)
+                    summary_df = combine(groupby(base_df, [:concept_id, :concept_name, :domain]), nrow => :count)
                 else
                     _funcs = [Base.Fix2(fun, conn) for fun in covariate_funcs]
                     person_ids = unique(base_df.person_id)
@@ -81,7 +74,7 @@ function analyze_concept_distribution(
                     
                     result_df = leftjoin(base_df, covariate_df, on=:person_id)
                     group_cols = [col for col in names(result_df) if col != "person_id"]
-                    summary_df = combine(groupby(result_df, group_cols), nrow => :n)
+                    summary_df = combine(groupby(result_df, group_cols), nrow => :count)
                 end
                 
                 all_results = vcat(all_results, summary_df)
@@ -92,7 +85,7 @@ function analyze_concept_distribution(
         end
     end
     
-    return sort(all_results, :n, rev=true)
+    return sort(all_results, :count, rev=true)
 end
 
 """
@@ -117,7 +110,7 @@ patient eligibility, data availability across multiple domains, and demographic 
 - `schema` - Database schema name. Default: `"dbt_synthea_dev"`
 
 # Returns
-- `DataFrame` - Feasibility metrics with columns: `metric`, `value`, `interpretation`, and optionally `domain`
+- `DataFrame` - Feasibility metrics with columns: `metric`, `value`, `interpretation`, and `domain`
 
 # Examples
 ```julia
@@ -139,7 +132,8 @@ function generate_feasibility_report(
     schema::String="dbt_synthea_dev"
     )
     
-    # Get concepts grouped by domain
+    isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
+    
     concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema)
     
     if isempty(concepts_by_domain)
@@ -151,24 +145,20 @@ function generate_feasibility_report(
         )
     end
     
-    # Get total patients in database
     fconn = _funsql(conn; schema=schema)
     person_table = _resolve_table(fconn, :person)
     total_patients_q = From(person_table) |> Group() |> Select(:total_patients => Agg.count())
     total_patients = DataFrame(DBInterface.execute(fconn, total_patients_q)).total_patients[1]
     
-    # Initialize aggregated metrics
     total_records_across_domains = 0
     all_eligible_patients = Set{Int}()
     domain_details = DataFrame()
     
-    # Process each domain
     for (domain_id, domain_concepts) in concepts_by_domain
         try
             table_symbol = domain_id_to_table(domain_id)
             setup = _setup_domain_query(conn; domain=table_symbol, schema=schema)
             
-            # Get records and patients for this domain
             concept_records_q = From(setup.tbl) |> 
                 Where(Fun.in(Get(setup.concept_col), domain_concepts...)) |>
                 Group() |>
@@ -181,11 +171,9 @@ function generate_feasibility_report(
             domain_patients_df = DataFrame(DBInterface.execute(setup.fconn, unique_patients_q))
             domain_patients = Set(domain_patients_df.person_id)
             
-            # Accumulate totals
             total_records_across_domains += domain_records
             union!(all_eligible_patients, domain_patients)
             
-            # Store domain-specific details
             push!(domain_details, (
                 domain = domain_id,
                 concepts = length(domain_concepts),
@@ -204,7 +192,6 @@ function generate_feasibility_report(
     avg_records_per_patient = unique_patients_with_concepts > 0 ? round(total_records_across_domains / unique_patients_with_concepts, digits=3) : 0.0
     population_coverage = round((unique_patients_with_concepts / total_patients) * 100, digits=3)
     
-    # Create summary report
     summary_report = DataFrame(
         metric = [
             "Total Patients",
@@ -233,7 +220,6 @@ function generate_feasibility_report(
         domain = fill("Summary", 6)
     )
     
-    # Add domain-specific breakdown
     domain_breakdown = DataFrame()
     for row in eachrow(domain_details)
         domain_coverage = round((row.patients / total_patients) * 100, digits=3)
