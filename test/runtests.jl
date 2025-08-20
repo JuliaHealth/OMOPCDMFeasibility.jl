@@ -10,13 +10,13 @@ using DataDeps
 function setup_test_connection()
     # Set up automatic acceptance of data download
     ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"
-    
+
     eunomia = Eunomia()
     conn = DB(eunomia)
-    
+
     occ.GenerateDatabaseDetails(:sqlite, "main")
     occ.GenerateTables(conn)
-    
+
     return conn
 end
 

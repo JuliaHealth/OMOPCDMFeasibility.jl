@@ -6,10 +6,12 @@ This is constructed from the serialized version information in the assets direct
 Used internally for mapping domains to database tables.
 """
 const DOMAIN_TABLE = let
-    versions  = deserialize(joinpath(@__DIR__, "..", "assets", "version_info"))
-    latest    = maximum(keys(versions))
-    tables    = versions[latest][:tables]
-    Dict{Symbol,Symbol}(Symbol(lowercase(String(t))) => Symbol(lowercase(String(t))) for t in keys(tables))
+    versions = deserialize(joinpath(@__DIR__, "..", "assets", "version_info"))
+    latest = maximum(keys(versions))
+    tables = versions[latest][:tables]
+    Dict{Symbol,Symbol}(
+        Symbol(lowercase(String(t))) => Symbol(lowercase(String(t))) for t in keys(tables)
+    )
 end
 
 """
@@ -39,12 +41,13 @@ name = get_concept_name(999999, conn)
 function get_concept_name(concept_id, conn; schema="main")
     fconn = _funsql(conn; schema=schema)
     concept_table = _resolve_table(fconn, :concept)
-    
-    query = From(concept_table) |>
-            Where(Get.concept_id .== concept_id) |>
-            Select(Get.concept_name)
-    
-    result = DataFrame(query |> FunSQL.render |> (sql -> DBInterface.execute(conn, String(sql))))
+
+    query =
+        Select(Get.concept_name)(Where(Get.concept_id .== concept_id)(From(concept_table)))
+
+    result = DataFrame(
+        (sql -> DBInterface.execute(conn, String(sql)))(FunSQL.render(query))
+    )
     return isempty(result) ? "Unknown" : result.concept_name[1]
 end
 
@@ -76,18 +79,20 @@ domains = get_concepts_by_domain(concepts, conn)
 function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main")
     fconn = _funsql(conn; schema=schema)
     concept_table = _resolve_table(fconn, :concept)
-    
-    query = From(concept_table) |>
-            Where(Fun.in(Get.concept_id, concept_ids...)) |>
-            Select(Get.concept_id, Get.domain_id, Get.concept_name)
-    
-    result = DataFrame(query |> FunSQL.render |> (sql -> DBInterface.execute(conn, String(sql))))
-    
+
+    query = Select(Get.concept_id, Get.domain_id, Get.concept_name)(Where(
+        Fun.in(Get.concept_id, concept_ids...)
+    )(From(concept_table)))
+
+    result = DataFrame(
+        (sql -> DBInterface.execute(conn, String(sql)))(FunSQL.render(query))
+    )
+
     if isempty(result)
-        return Dict{String, Vector{Int}}()
+        return Dict{String,Vector{Int}}()
     end
-    
-    grouped = Dict{String, Vector{Int}}()
+
+    grouped = Dict{String,Vector{Int}}()
     for row in eachrow(result)
         domain = row.domain_id
         if !haskey(grouped, domain)
@@ -95,7 +100,7 @@ function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="ma
         end
         push!(grouped[domain], row.concept_id)
     end
-    
+
     return grouped
 end
 
@@ -148,7 +153,7 @@ col = _concept_col(:person)
 # Returns: :gender_concept_id
 ```
 """
-function _concept_col(tblsym::Symbol) 
+function _concept_col(tblsym::Symbol)
     if tblsym == :person
         return :gender_concept_id
     else
@@ -174,7 +179,7 @@ dialect and schema reflection for query building.
 - `SQLConnection` - FunSQL connection object with reflected schema
 """
 function _funsql(conn; schema::String="main")
-    return SQLConnection(conn; catalog = reflect(conn; schema=schema, dialect=:sqlite))
+    return SQLConnection(conn; catalog=reflect(conn; schema=schema, dialect=:sqlite))
 end
 
 """
@@ -228,7 +233,7 @@ result = _counter_reducer([1,2,3], [x -> x .* 2, sum])
 """
 function _counter_reducer(sub, funcs)
     for fun in funcs
-        sub = fun(sub)  
+        sub = fun(sub)
     end
     return sub
 end
@@ -264,7 +269,7 @@ function _setup_domain_query(conn; domain::Symbol, schema::String="main")
     fconn = _funsql(conn; schema=schema)
     tbl = _resolve_table(fconn, tblsym)
     concept_table = _resolve_table(fconn, :concept)
-    
+
     return (fconn=fconn, tbl=tbl, concept_table=concept_table, concept_col=concept_col)
 end
 
@@ -341,8 +346,8 @@ function domain_id_to_table(domain_id::String)
         "Specimen" => :specimen,
         "Gender" => :person,
         "Race" => :person,
-        "Ethnicity" => :person
+        "Ethnicity" => :person,
     )
-    
+
     return get(domain_mapping, domain_id, Symbol(lowercase(domain_id) * "_occurrence"))
 end

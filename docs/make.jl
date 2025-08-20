@@ -1,7 +1,9 @@
 using OMOPCDMFeasibility
 using Documenter
 
-DocMeta.setdocmeta!(OMOPCDMFeasibility, :DocTestSetup, :(using OMOPCDMFeasibility); recursive=true)
+DocMeta.setdocmeta!(
+    OMOPCDMFeasibility, :DocTestSetup, :(using OMOPCDMFeasibility); recursive=true
+)
 
 makedocs(;
     modules=[OMOPCDMFeasibility],
@@ -12,12 +14,7 @@ makedocs(;
         edit_link="master",
         assets=String[],
     ),
-    pages=[
-        "Home" => "index.md",
-    ],
+    pages=["Home" => "index.md"],
 )
 
-deploydocs(;
-    repo="github.com/JuliaHealth/OMOPCDMFeasibility.jl",
-    devbranch="master",
-)
+deploydocs(; repo="github.com/JuliaHealth/OMOPCDMFeasibility.jl", devbranch="master")
