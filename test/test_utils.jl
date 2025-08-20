@@ -1,30 +1,30 @@
 @testset "get_concept_name" begin
-    result = OMOPCDMFeasibility.get_concept_name(8507, TEST_CONN; schema="main")
+    result = OMOPCDMFeasibility.get_concept_name(8507, TEST_CONN; schema="main", dialect=:sqlite)
     @test result isa String
     @test result != "Unknown"
 
-    result = OMOPCDMFeasibility.get_concept_name(999999999, TEST_CONN; schema="main")
+    result = OMOPCDMFeasibility.get_concept_name(999999999, TEST_CONN; schema="main", dialect=:sqlite)
     @test result == "Unknown"
 end
 
 @testset "get_concepts_by_domain" begin
     concept_ids = [8507, 8532]
     result = OMOPCDMFeasibility.get_concepts_by_domain(
-        concept_ids, TEST_CONN; schema="main"
+        concept_ids, TEST_CONN; schema="main", dialect=:sqlite
     )
     @test result isa Dict
     @test !isempty(result)
 
     # Test with empty vector
     result_empty = OMOPCDMFeasibility.get_concepts_by_domain(
-        Int[], TEST_CONN; schema="main"
+        Int[], TEST_CONN; schema="main", dialect=:sqlite
     )
     @test result_empty isa Dict
     @test isempty(result_empty)
 
     # Test with invalid concept IDs
     result_invalid = OMOPCDMFeasibility.get_concepts_by_domain(
-        [999999999], TEST_CONN; schema="main"
+        [999999999], TEST_CONN; schema="main", dialect=:sqlite
     )
     @test result_invalid isa Dict
     @test isempty(result_invalid)
@@ -53,7 +53,7 @@ end
 end
 
 @testset "Internal Helper Functions" begin
-    fconn = OMOPCDMFeasibility._funsql(TEST_CONN; schema="main")
+    fconn = OMOPCDMFeasibility._funsql(TEST_CONN; schema="main", dialect=:sqlite)
     @test fconn isa OMOPCDMFeasibility.FunSQL.SQLConnection
 
     concept_table = OMOPCDMFeasibility._resolve_table(fconn, :concept)
@@ -67,9 +67,9 @@ end
 
 @testset "Edge Cases and Error Handling" begin
     # Test get_concept_name edge cases
-    @test OMOPCDMFeasibility.get_concept_name(0, TEST_CONN; schema="main") ==
+    @test OMOPCDMFeasibility.get_concept_name(0, TEST_CONN; schema="main", dialect=:sqlite) ==
         "No matching concept"
-    @test OMOPCDMFeasibility.get_concept_name(-1, TEST_CONN; schema="main") == "Unknown"
+    @test OMOPCDMFeasibility.get_concept_name(-1, TEST_CONN; schema="main", dialect=:sqlite) == "Unknown"
 
     # Test format_number with edge cases
     @test OMOPCDMFeasibility.format_number(0.5) == "1"
@@ -80,6 +80,6 @@ end
     @test OMOPCDMFeasibility.domain_id_to_table("UPPERCASE") == :uppercase_occurrence
 
     # Test internal function error handling
-    fconn = OMOPCDMFeasibility._funsql(TEST_CONN; schema="main")
+    fconn = OMOPCDMFeasibility._funsql(TEST_CONN; schema="main", dialect=:sqlite)
     @test_throws ErrorException OMOPCDMFeasibility._resolve_table(fconn, :nonexistent_table)
 end

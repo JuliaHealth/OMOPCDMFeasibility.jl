@@ -6,16 +6,14 @@ This is constructed from the serialized version information in the assets direct
 Used internally for mapping domains to database tables.
 """
 const DOMAIN_TABLE = let
-    versions = deserialize(joinpath(@__DIR__, "..", "assets", "version_info"))
-    latest = maximum(keys(versions))
-    tables = versions[latest][:tables]
-    Dict{Symbol,Symbol}(
-        Symbol(lowercase(String(t))) => Symbol(lowercase(String(t))) for t in keys(tables)
-    )
+    versions  = deserialize(joinpath(@__DIR__, "..", "assets", "version_info"))
+    latest    = maximum(keys(versions))
+    tables    = versions[latest][:tables]
+    Dict{Symbol,Symbol}(Symbol(lowercase(String(t))) => Symbol(lowercase(String(t))) for t in keys(tables))
 end
 
 """
-    get_concept_name(concept_id, conn; schema="dbt_synthea_dev") -> String
+    get_concept_name(concept_id, conn; schema="main", dialect=:postgresql) -> String
 
 Retrieves the human-readable name for a given OMOP concept ID.
 
@@ -25,6 +23,7 @@ Retrieves the human-readable name for a given OMOP concept ID.
 
 # Keyword Arguments  
 - `schema` - Database schema name. Default: `"main"`
+- `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
 
 # Returns
 - `String` - The concept name, or "Unknown" if the concept ID is not found
@@ -38,21 +37,20 @@ name = get_concept_name(999999, conn)
 # Returns: "Unknown"
 ```
 """
-function get_concept_name(concept_id, conn; schema="main")
-    fconn = _funsql(conn; schema=schema)
+function get_concept_name(concept_id, conn; schema="main", dialect=:postgresql)
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
     concept_table = _resolve_table(fconn, :concept)
-
-    query =
-        Select(Get.concept_name)(Where(Get.concept_id .== concept_id)(From(concept_table)))
-
-    result = DataFrame(
-        (sql -> DBInterface.execute(conn, String(sql)))(FunSQL.render(query))
-    )
+    
+    query = From(concept_table) |>
+            Where(Get.concept_id .== concept_id) |>
+            Select(Get.concept_name)
+    
+    result = DataFrame(query |> FunSQL.render |> (sql -> DBInterface.execute(conn, String(sql))))
     return isempty(result) ? "Unknown" : result.concept_name[1]
 end
 
 """
-    get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="dbt_synthea_dev") -> Dict{String, Vector{Int}}
+    get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main", dialect=:postgresql) -> Dict{String, Vector{Int}}
 
 Groups a list of OMOP concept IDs by their domain classification.
 
@@ -65,6 +63,7 @@ This function queries the concept table to determine which domain each concept b
 
 # Keyword Arguments
 - `schema` - Database schema name. Default: `"main"`
+- `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
 
 # Returns
 - `Dict{String, Vector{Int}}` - Dictionary mapping domain names to vectors of concept IDs
@@ -76,23 +75,21 @@ domains = get_concepts_by_domain(concepts, conn)
 # Returns: Dict("Condition" => [201820, 192671], "Drug" => [1503297])
 ```
 """
-function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main")
-    fconn = _funsql(conn; schema=schema)
+function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main", dialect=:postgresql)
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
     concept_table = _resolve_table(fconn, :concept)
-
-    query = Select(Get.concept_id, Get.domain_id, Get.concept_name)(Where(
-        Fun.in(Get.concept_id, concept_ids...)
-    )(From(concept_table)))
-
-    result = DataFrame(
-        (sql -> DBInterface.execute(conn, String(sql)))(FunSQL.render(query))
-    )
-
+    
+    query = From(concept_table) |>
+            Where(Fun.in(Get.concept_id, concept_ids...)) |>
+            Select(Get.concept_id, Get.domain_id, Get.concept_name)
+    
+    result = DataFrame(query |> FunSQL.render |> (sql -> DBInterface.execute(conn, String(sql))))
+    
     if isempty(result)
-        return Dict{String,Vector{Int}}()
+        return Dict{String, Vector{Int}}()
     end
-
-    grouped = Dict{String,Vector{Int}}()
+    
+    grouped = Dict{String, Vector{Int}}()
     for row in eachrow(result)
         domain = row.domain_id
         if !haskey(grouped, domain)
@@ -100,7 +97,7 @@ function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="ma
         end
         push!(grouped[domain], row.concept_id)
     end
-
+    
     return grouped
 end
 
@@ -153,7 +150,7 @@ col = _concept_col(:person)
 # Returns: :gender_concept_id
 ```
 """
-function _concept_col(tblsym::Symbol)
+function _concept_col(tblsym::Symbol) 
     if tblsym == :person
         return :gender_concept_id
     else
@@ -162,24 +159,25 @@ function _concept_col(tblsym::Symbol)
 end
 
 """
-    _funsql(conn; schema::String="main") -> SQLConnection
+    _funsql(conn; schema::String="main", dialect::Symbol=:postgresql) -> SQLConnection
 
 Creates a FunSQL connection with database schema reflection.
 
 This internal function sets up a FunSQL SQLConnection with the appropriate database
-dialect and schema reflection for query building.
+dialect and schema reflection for query building. Use :postgresql for DuckDB and :sqlite for SQLite.
 
 # Arguments
 - `conn` - Raw database connection
 
 # Keyword Arguments
 - `schema` - Database schema name. Default: `"main"`
+- `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
 
 # Returns
 - `SQLConnection` - FunSQL connection object with reflected schema
 """
-function _funsql(conn; schema::String="main")
-    return SQLConnection(conn; catalog=reflect(conn; schema=schema, dialect=:sqlite))
+function _funsql(conn; schema::String="main", dialect::Symbol=:postgresql)
+    return SQLConnection(conn; catalog = reflect(conn; schema=schema, dialect=dialect))
 end
 
 """
@@ -233,13 +231,13 @@ result = _counter_reducer([1,2,3], [x -> x .* 2, sum])
 """
 function _counter_reducer(sub, funcs)
     for fun in funcs
-        sub = fun(sub)
+        sub = fun(sub)  
     end
     return sub
 end
 
 """
-    _setup_domain_query(conn; domain::Symbol, schema::String="main") -> NamedTuple
+    _setup_domain_query(conn; domain::Symbol, schema::String="main", dialect::Symbol=:postgresql) -> NamedTuple
 
 Sets up the necessary components for querying a specific domain table.
 
@@ -253,6 +251,7 @@ concept column name.
 # Keyword Arguments
 - `domain` - Domain table symbol (e.g., :condition_occurrence)
 - `schema` - Database schema name. Default: `"main"`
+- `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
 
 # Returns
 - `NamedTuple` - Contains fconn, tbl, concept_table, and concept_col components
@@ -263,13 +262,13 @@ setup = _setup_domain_query(conn; domain=:condition_occurrence)
 # Returns: (fconn=..., tbl=..., concept_table=..., concept_col=:condition_concept_id)
 ```
 """
-function _setup_domain_query(conn; domain::Symbol, schema::String="main")
+function _setup_domain_query(conn; domain::Symbol, schema::String="main", dialect::Symbol=:postgresql)
     tblsym = domain
     concept_col = _concept_col(tblsym)
-    fconn = _funsql(conn; schema=schema)
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
     tbl = _resolve_table(fconn, tblsym)
     concept_table = _resolve_table(fconn, :concept)
-
+    
     return (fconn=fconn, tbl=tbl, concept_table=concept_table, concept_col=concept_col)
 end
 
@@ -310,7 +309,7 @@ end
 """
     domain_id_to_table(domain_id::String) -> Symbol
 
-Maps OMOP domain_id strings to their corresponding database table symbols.
+Map OMOP domain_id strings to their corresponding database table symbols.
 
 This function provides the mapping between OMOP domain classifications and the actual
 database tables where those concepts are stored. It includes special handling for
@@ -346,8 +345,8 @@ function domain_id_to_table(domain_id::String)
         "Specimen" => :specimen,
         "Gender" => :person,
         "Race" => :person,
-        "Ethnicity" => :person,
+        "Ethnicity" => :person
     )
-
+    
     return get(domain_mapping, domain_id, Symbol(lowercase(domain_id) * "_occurrence"))
 end

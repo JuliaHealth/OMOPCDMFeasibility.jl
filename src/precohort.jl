@@ -3,7 +3,8 @@
         conn;
         concept_set::Vector{<:Integer},
         covariate_funcs::AbstractVector{<:Function} = Function[],
-        schema::String = "dbt_synthea_dev"
+        schema::String = "main",
+        dialect::Symbol = :postgresql
     )
 
 Analyzes the distribution of medical concepts across patient demographics by automatically detecting domains.
@@ -15,6 +16,7 @@ Analyzes the distribution of medical concepts across patient demographics by aut
 # Keyword Arguments
 - `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic stratification. Default: `Function[]`
 - `schema` - Database schema name. Default: `"main"`
+- `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
 
 # Returns
 - `DataFrame` - Summary statistics with columns for concept information, domain, covariate values, and patient counts (`count`)
@@ -37,10 +39,11 @@ function analyze_concept_distribution(
     concept_set::Vector{<:Integer},
     covariate_funcs::AbstractVector{<:Function}=Function[],
     schema::String="main",
+    dialect::Symbol=:postgresql,
 )
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
 
-    concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema)
+    concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
 
     if isempty(concepts_by_domain)
         return DataFrame(;
@@ -54,7 +57,7 @@ function analyze_concept_distribution(
         try
             table_symbol = domain_id_to_table(domain_id)
 
-            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema)
+            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
 
             base = Where(Fun.in(Get(setup.concept_col), domain_concepts...))(Join(
                 :main_concept => setup.concept_table,
@@ -102,7 +105,8 @@ end
         conn;
         concept_set::Vector{<:Integer},
         covariate_funcs::AbstractVector{<:Function} = Function[],
-        schema::String = "dbt_synthea_dev"
+        schema::String = "main",
+        dialect::Symbol = :postgresql
     )
 
 Generates a comprehensive feasibility analysis report with automatic domain detection.
@@ -117,6 +121,7 @@ patient eligibility, data availability across multiple domains, and demographic 
 # Keyword Arguments
 - `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic analysis (e.g., `GetPatientGender`, `GetPatientRace`, `GetPatientEthnicity`). Default: `Function[]`
 - `schema` - Database schema name. Default: `"main"`
+- `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
 
 # Returns
 - `DataFrame` - Feasibility metrics with columns: `metric`, `value`, `interpretation`, and `domain`
@@ -139,10 +144,11 @@ function generate_feasibility_report(
     concept_set::Vector{<:Integer},
     covariate_funcs::AbstractVector{<:Function}=Function[],
     schema::String="main",
+    dialect::Symbol=:postgresql,
 )
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
 
-    concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema)
+    concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
 
     if isempty(concepts_by_domain)
         return DataFrame(;
@@ -153,7 +159,7 @@ function generate_feasibility_report(
         )
     end
 
-    fconn = _funsql(conn; schema=schema)
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
     person_table = _resolve_table(fconn, :person)
     total_patients_q = Select(:total_patients => Agg.count())(Group()(From(person_table)))
     total_patients = DataFrame(DBInterface.execute(fconn, total_patients_q)).total_patients[1]
@@ -165,7 +171,7 @@ function generate_feasibility_report(
     for (domain_id, domain_concepts) in concepts_by_domain
         try
             table_symbol = domain_id_to_table(domain_id)
-            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema)
+            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
 
             concept_records_q = Select(:total_concept_records => Agg.count())(Group()(Where(
                 Fun.in(Get(setup.concept_col), domain_concepts...)
