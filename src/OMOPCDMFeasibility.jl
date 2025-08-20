@@ -1,9 +1,6 @@
-__precompile__(false)
-
 module OMOPCDMFeasibility
 
 using DataFrames
-using OMOPCDMCohortCreator
 using DBInterface
 using FunSQL:
     FunSQL, Agg, Fun, From, Get, Group, Join, LeftJoin, Select, Where, SQLConnection, reflect

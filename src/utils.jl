@@ -1,3 +1,10 @@
+"""
+    DOMAIN_TABLE
+
+A constant dictionary mapping OMOP domain symbols to their corresponding table symbols.
+This is constructed from the serialized version information in the assets directory.
+Used internally for mapping domains to database tables.
+"""
 const DOMAIN_TABLE = let
     versions  = deserialize(joinpath(@__DIR__, "..", "assets", "version_info"))
     latest    = maximum(keys(versions))
@@ -5,7 +12,31 @@ const DOMAIN_TABLE = let
     Dict{Symbol,Symbol}(Symbol(lowercase(String(t))) => Symbol(lowercase(String(t))) for t in keys(tables))
 end
 
-function get_concept_name(concept_id, conn; schema="dbt_synthea_dev")
+"""
+    get_concept_name(concept_id, conn; schema="dbt_synthea_dev") -> String
+
+Retrieves the human-readable name for a given OMOP concept ID.
+
+# Arguments
+- `concept_id` - The OMOP concept ID to look up
+- `conn` - Database connection using DBInterface
+
+# Keyword Arguments  
+- `schema` - Database schema name. Default: `"main"`
+
+# Returns
+- `String` - The concept name, or "Unknown" if the concept ID is not found
+
+# Examples
+```julia
+name = get_concept_name(8507, conn)
+# Returns: "Male"
+
+name = get_concept_name(999999, conn) 
+# Returns: "Unknown"
+```
+"""
+function get_concept_name(concept_id, conn; schema="main")
     fconn = _funsql(conn; schema=schema)
     concept_table = _resolve_table(fconn, :concept)
     
@@ -17,8 +48,32 @@ function get_concept_name(concept_id, conn; schema="dbt_synthea_dev")
     return isempty(result) ? "Unknown" : result.concept_name[1]
 end
 
-function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="dbt_synthea_dev")
-    """Get domain information for concept IDs and group them by domain"""
+"""
+    get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="dbt_synthea_dev") -> Dict{String, Vector{Int}}
+
+Groups a list of OMOP concept IDs by their domain classification.
+
+This function queries the concept table to determine which domain each concept belongs to
+(e.g., "Condition", "Drug", "Procedure") and returns them grouped by domain.
+
+# Arguments
+- `concept_ids` - Vector of OMOP concept IDs to classify
+- `conn` - Database connection using DBInterface
+
+# Keyword Arguments
+- `schema` - Database schema name. Default: `"main"`
+
+# Returns
+- `Dict{String, Vector{Int}}` - Dictionary mapping domain names to vectors of concept IDs
+
+# Examples
+```julia
+concepts = [201820, 192671, 1503297]
+domains = get_concepts_by_domain(concepts, conn)
+# Returns: Dict("Condition" => [201820, 192671], "Drug" => [1503297])
+```
+"""
+function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main")
     fconn = _funsql(conn; schema=schema)
     concept_table = _resolve_table(fconn, :concept)
     
@@ -44,19 +99,102 @@ function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="db
     return grouped
 end
 
+"""
+    domain_to_table(domain::Symbol) -> Symbol
+
+Maps a domain symbol to its corresponding database table symbol using the DOMAIN_TABLE lookup.
+
+# Arguments
+- `domain` - The domain symbol to map
+
+# Returns
+- `Symbol` - The corresponding table symbol
+
+# Throws
+- `ArgumentError` - If the domain is not found in DOMAIN_TABLE
+
+# Examples
+```julia
+table = domain_to_table(:condition)
+# Returns: :condition_occurrence
+```
+"""
 function domain_to_table(domain::Symbol)
     haskey(DOMAIN_TABLE, domain) || throw(ArgumentError("Unknown domain: $domain"))
     return DOMAIN_TABLE[domain]
 end
 
+"""
+    _concept_col(tblsym::Symbol) -> Symbol
+
+Generates the concept column name for a given table symbol.
+
+This is an internal helper function that constructs the appropriate concept column name
+based on table naming conventions. Special handling is provided for the person table
+which uses gender_concept_id.
+
+# Arguments
+- `tblsym` - The table symbol
+
+# Returns
+- `Symbol` - The concept column name for that table
+
+# Examples
+```julia
+col = _concept_col(:condition_occurrence)
+# Returns: :condition_concept_id
+
+col = _concept_col(:person)
+# Returns: :gender_concept_id
+```
+"""
 function _concept_col(tblsym::Symbol) 
-    Symbol("$(split(String(tblsym), '_')[1])_concept_id")
+    if tblsym == :person
+        return :gender_concept_id
+    else
+        return Symbol("$(split(String(tblsym), '_')[1])_concept_id")
+    end
 end
 
-function _funsql(conn; schema::String="dbt_synthea_dev")
-    return SQLConnection(conn; catalog = reflect(conn; schema=schema, dialect=:postgresql))
+"""
+    _funsql(conn; schema::String="main") -> SQLConnection
+
+Creates a FunSQL connection with database schema reflection.
+
+This internal function sets up a FunSQL SQLConnection with the appropriate database
+dialect and schema reflection for query building.
+
+# Arguments
+- `conn` - Raw database connection
+
+# Keyword Arguments
+- `schema` - Database schema name. Default: `"main"`
+
+# Returns
+- `SQLConnection` - FunSQL connection object with reflected schema
+"""
+function _funsql(conn; schema::String="main")
+    return SQLConnection(conn; catalog = reflect(conn; schema=schema, dialect=:sqlite))
 end
 
+"""
+    _resolve_table(fconn::SQLConnection, tblsym::Symbol) -> Table
+
+Resolves a table symbol to its corresponding FunSQL table object.
+
+This internal function looks up a table by name in the FunSQL catalog, performing
+case-insensitive matching.
+
+# Arguments
+- `fconn` - FunSQL SQLConnection object
+- `tblsym` - Table symbol to resolve
+
+# Returns
+- `Table` - FunSQL table object
+
+# Throws
+- `ErrorException` - If the table is not found in the catalog
+"""
 function _resolve_table(fconn::SQLConnection, tblsym::Symbol)
     lname = lowercase(String(tblsym))
     for t in values(fconn.catalog.tables)
@@ -67,6 +205,27 @@ function _resolve_table(fconn::SQLConnection, tblsym::Symbol)
     error("table not found: $(tblsym)")
 end
 
+"""
+    _counter_reducer(sub, funcs) -> Any
+
+Applies a sequence of functions to a subject, reducing through function composition.
+
+This internal helper function sequentially applies each function in the funcs vector
+to the result of the previous function, starting with sub.
+
+# Arguments
+- `sub` - Initial subject/input to transform
+- `funcs` - Vector of functions to apply sequentially
+
+# Returns
+- `Any` - Result after applying all functions
+
+# Examples
+```julia
+result = _counter_reducer([1,2,3], [x -> x .* 2, sum])
+# Equivalent to: sum([1,2,3] .* 2) = sum([2,4,6]) = 12
+```
+"""
 function _counter_reducer(sub, funcs)
     for fun in funcs
         sub = fun(sub)  
@@ -74,8 +233,33 @@ function _counter_reducer(sub, funcs)
     return sub
 end
 
-function _setup_domain_query(conn; domain::Symbol, schema::String="dbt_synthea_dev")
-    tblsym = domain_to_table(domain)
+"""
+    _setup_domain_query(conn; domain::Symbol, schema::String="main") -> NamedTuple
+
+Sets up the necessary components for querying a specific domain table.
+
+This internal function prepares all the components needed to query a domain-specific
+table including the FunSQL connection, resolved table objects, and appropriate
+concept column name.
+
+# Arguments
+- `conn` - Database connection
+
+# Keyword Arguments
+- `domain` - Domain table symbol (e.g., :condition_occurrence)
+- `schema` - Database schema name. Default: `"main"`
+
+# Returns
+- `NamedTuple` - Contains fconn, tbl, concept_table, and concept_col components
+
+# Examples
+```julia
+setup = _setup_domain_query(conn; domain=:condition_occurrence)
+# Returns: (fconn=..., tbl=..., concept_table=..., concept_col=:condition_concept_id)
+```
+"""
+function _setup_domain_query(conn; domain::Symbol, schema::String="main")
+    tblsym = domain
     concept_col = _concept_col(tblsym)
     fconn = _funsql(conn; schema=schema)
     tbl = _resolve_table(fconn, tblsym)
@@ -84,18 +268,68 @@ function _setup_domain_query(conn; domain::Symbol, schema::String="dbt_synthea_d
     return (fconn=fconn, tbl=tbl, concept_table=concept_table, concept_col=concept_col)
 end
 
+"""
+    format_number(n) -> String
+
+Formats a number into a human-readable string with appropriate scaling.
+
+This utility function formats numbers using common abbreviations:
+- Numbers ≥ 1,000,000 are formatted as "X.XM" (millions)
+- Numbers ≥ 1,000 are formatted as "X.XK" (thousands)  
+- Numbers < 1,000 are formatted as integers with ties rounded up
+
+# Arguments
+- `n` - Number to format
+
+# Returns
+- `String` - Formatted number string
+
+# Examples
+```julia
+format_number(1234567)  # Returns: "1.2M"
+format_number(5432)     # Returns: "5.4K" 
+format_number(123)      # Returns: "123"
+format_number(0.5)      # Returns: "1"
+```
+"""
 function format_number(n)
     if n >= 1_000_000
         return "$(round(n/1_000_000, digits=1))M"
     elseif n >= 1_000
         return "$(round(n/1_000, digits=1))K"
     else
-        return string(Int(round(n)))
+        return string(Int(round(n, RoundNearestTiesUp)))
     end
 end
 
+"""
+    domain_id_to_table(domain_id::String) -> Symbol
+
+Maps OMOP domain_id strings to their corresponding database table symbols.
+
+This function provides the mapping between OMOP domain classifications and the actual
+database tables where those concepts are stored. It includes special handling for
+person-related domains and falls back to a naming convention for unknown domains.
+
+# Arguments
+- `domain_id` - OMOP domain identifier string (e.g., "Condition", "Drug")
+
+# Returns
+- `Symbol` - Database table symbol (e.g., :condition_occurrence, :drug_exposure)
+
+# Examples
+```julia
+table = domain_id_to_table("Condition")
+# Returns: :condition_occurrence
+
+table = domain_id_to_table("Gender") 
+# Returns: :person
+
+table = domain_id_to_table("CustomDomain")
+# Returns: :customdomain_occurrence
+```
+"""
 function domain_id_to_table(domain_id::String)
-    """Map OMOP domain_id to actual table names"""
     domain_mapping = Dict(
         "Condition" => :condition_occurrence,
         "Drug" => :drug_exposure,
@@ -104,7 +338,10 @@ function domain_id_to_table(domain_id::String)
         "Observation" => :observation,
         "Visit" => :visit_occurrence,
         "Device" => :device_exposure,
-        "Specimen" => :specimen
+        "Specimen" => :specimen,
+        "Gender" => :person,
+        "Race" => :person,
+        "Ethnicity" => :person
     )
     
     return get(domain_mapping, domain_id, Symbol(lowercase(domain_id) * "_occurrence"))

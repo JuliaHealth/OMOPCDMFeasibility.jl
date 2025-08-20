@@ -6,7 +6,7 @@
         schema::String = "dbt_synthea_dev"
     )
 
-Analyze the distribution of medical concepts across patient demographics by automatically detecting domains.
+Analyzes the distribution of medical concepts across patient demographics by automatically detecting domains.
 
 # Arguments
 - `conn` - Database connection using DBInterface
@@ -14,7 +14,7 @@ Analyze the distribution of medical concepts across patient demographics by auto
 
 # Keyword Arguments
 - `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic stratification. Default: `Function[]`
-- `schema` - Database schema name. Default: `"dbt_synthea_dev"`
+- `schema` - Database schema name. Default: `"main"`
 
 # Returns
 - `DataFrame` - Summary statistics with columns for concept information, domain, covariate values, and patient counts (`count`)
@@ -36,8 +36,8 @@ function analyze_concept_distribution(
     conn; 
     concept_set::Vector{<:Integer}, 
     covariate_funcs::AbstractVector{<:Function}=Function[], 
-    schema::String="dbt_synthea_dev"
-    )
+    schema::String="main"
+)
     
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
     
@@ -85,7 +85,7 @@ function analyze_concept_distribution(
         end
     end
     
-    return sort(all_results, :count, rev=true)
+    return isempty(all_results) ? all_results : sort(all_results, :count, rev=true)
 end
 
 """
@@ -96,7 +96,7 @@ end
         schema::String = "dbt_synthea_dev"
     )
 
-Generate a comprehensive feasibility analysis report with automatic domain detection.
+Generates a comprehensive feasibility analysis report with automatic domain detection.
 
 This function provides a complete feasibility assessment including population coverage, 
 patient eligibility, data availability across multiple domains, and demographic stratification.
@@ -107,7 +107,7 @@ patient eligibility, data availability across multiple domains, and demographic 
 
 # Keyword Arguments
 - `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic analysis (e.g., `GetPatientGender`, `GetPatientRace`, `GetPatientEthnicity`). Default: `Function[]`
-- `schema` - Database schema name. Default: `"dbt_synthea_dev"`
+- `schema` - Database schema name. Default: `"main"`
 
 # Returns
 - `DataFrame` - Feasibility metrics with columns: `metric`, `value`, `interpretation`, and `domain`
@@ -129,8 +129,8 @@ function generate_feasibility_report(
     conn; 
     concept_set::Vector{<:Integer}, 
     covariate_funcs::AbstractVector{<:Function}=Function[], 
-    schema::String="dbt_synthea_dev"
-    )
+    schema::String="main"
+)
     
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
     
