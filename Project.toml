@@ -22,7 +22,7 @@ InlineStrings = "1.4.4"
 JuliaFormatter = "2.1.6"
 OMOPCommonDataModel = "0.1"
 PrettyTables = "2.4.0"
-Serialization = "1.11.0"
+Serialization = "1.10, 1.11"
 julia = "1.10"
 
 [extras]

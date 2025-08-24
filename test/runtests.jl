@@ -15,7 +15,11 @@ function setup_test_connection()
     conn = DB(eunomia)
 
     occ.GenerateDatabaseDetails(:sqlite, "main")
-    occ.GenerateTables(conn)
+    
+    # Force compilation and avoid world age issues
+    Base.invokelatest() do
+        occ.GenerateTables(conn)
+    end
 
     return conn
 end
