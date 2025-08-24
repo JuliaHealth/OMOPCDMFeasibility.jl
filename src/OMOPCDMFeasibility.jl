@@ -16,7 +16,6 @@ using FunSQL:
     SQLConnection,
     reflect
 using OMOPCommonDataModel
-using Serialization
 
 include("utils.jl")
 include("precohort.jl")

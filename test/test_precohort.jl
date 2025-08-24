@@ -1,4 +1,3 @@
-
 @testset "analyze_concept_distribution" begin
     concept_ids = [201820, 192671]
 

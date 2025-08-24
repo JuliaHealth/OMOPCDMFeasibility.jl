@@ -1,18 +1,4 @@
 """
-    DOMAIN_TABLE
-
-A constant dictionary mapping OMOP domain symbols to their corresponding table symbols.
-This is constructed from the serialized version information in the assets directory.
-Used internally for mapping domains to database tables.
-"""
-const DOMAIN_TABLE = let
-    versions  = deserialize(joinpath(@__DIR__, "..", "assets", "version_info"))
-    latest    = maximum(keys(versions))
-    tables    = versions[latest][:tables]
-    Dict{Symbol,Symbol}(Symbol(lowercase(String(t))) => Symbol(lowercase(String(t))) for t in keys(tables))
-end
-
-"""
     _get_concept_name(concept_id, conn; schema="main", dialect=:postgresql) -> String
 
 Retrieves the human-readable name for a given OMOP concept ID.
@@ -99,31 +85,6 @@ function _get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="m
     end
     
     return grouped
-end
-
-"""
-    _domain_to_table(domain::Symbol) -> Symbol
-
-Maps a domain symbol to its corresponding database table symbol using the DOMAIN_TABLE lookup.
-
-# Arguments
-- `domain` - The domain symbol to map
-
-# Returns
-- `Symbol` - The corresponding table symbol
-
-# Throws
-- `ArgumentError` - If the domain is not found in DOMAIN_TABLE
-
-# Examples
-```julia
-table = _domain_to_table(:condition)
-# Returns: :condition_occurrence
-```
-"""
-function _domain_to_table(domain::Symbol)
-    haskey(DOMAIN_TABLE, domain) || throw(ArgumentError("Unknown domain: $domain"))
-    return DOMAIN_TABLE[domain]
 end
 
 """
