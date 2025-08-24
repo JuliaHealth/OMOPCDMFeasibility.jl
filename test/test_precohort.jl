@@ -43,6 +43,19 @@
         TEST_CONN; concept_set=single_concept, schema="main", dialect=:sqlite
     )
     @test result_single isa DataFrame
+
+    # Test with covariate functions to hit the else branch
+    result_with_real_covariates = analyze_concept_distribution(
+        TEST_CONN; concept_set=concept_ids, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
+    )
+    @test result_with_real_covariates isa DataFrame
+    @test !isempty(result_with_real_covariates)
+
+    # Test catch block by using a concept that maps to an invalid domain
+    test_catch_result = analyze_concept_distribution(
+        TEST_CONN; concept_set=[999999999], schema="main", dialect=:sqlite
+    )
+    @test test_catch_result isa DataFrame
 end
 
 @testset "generate_summary" begin
@@ -94,6 +107,19 @@ end
     )
     @test result_invalid isa DataFrame
     @test "No Valid Concepts" in result_invalid.metric
+
+    # Test with covariate functions to hit the else branch
+    result_with_covariates = generate_summary(
+        TEST_CONN; concept_set=concept_ids, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
+    )
+    @test result_with_covariates isa DataFrame
+    @test !isempty(result_with_covariates)
+
+    # Test catch block by using a concept that may cause domain errors
+    test_catch_result = generate_summary(
+        TEST_CONN; concept_set=[999999999], schema="main", dialect=:sqlite
+    )
+    @test test_catch_result isa DataFrame
 end
 
 @testset "generate_domain_breakdown" begin
@@ -136,4 +162,16 @@ end
         TEST_CONN; concept_set=invalid_concepts, schema="main", dialect=:sqlite
     )
     @test result_invalid isa DataFrame
+
+    # Test with covariate functions to hit the else branch
+    result_with_covariates = generate_domain_breakdown(
+        TEST_CONN; concept_set=concept_ids, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
+    )
+    @test result_with_covariates isa DataFrame
+
+    # Test catch block by using a concept that may cause domain errors
+    test_catch_result = generate_domain_breakdown(
+        TEST_CONN; concept_set=[999999999], schema="main", dialect=:sqlite
+    )
+    @test test_catch_result isa DataFrame
 end

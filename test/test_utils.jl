@@ -65,6 +65,17 @@ end
     @test result == test_data
 end
 
+@testset "_concept_col tests" begin
+    # Test condition domain
+    @test OMOPCDMFeasibility._concept_col(:condition_occurrence) == :condition_concept_id
+    
+    # Test person domain - this should hit the special case
+    @test OMOPCDMFeasibility._concept_col(:person) == :gender_concept_id
+    
+    # Test unknown domain - this should hit the generic case
+    @test OMOPCDMFeasibility._concept_col(:unknown_table) == :unknown_concept_id
+end
+
 @testset "Edge Cases and Error Handling" begin
     # Test _get_concept_name edge cases
     @test OMOPCDMFeasibility._get_concept_name(0, TEST_CONN; schema="main", dialect=:sqlite) ==
