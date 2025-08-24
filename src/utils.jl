@@ -13,7 +13,7 @@ const DOMAIN_TABLE = let
 end
 
 """
-    get_concept_name(concept_id, conn; schema="main", dialect=:postgresql) -> String
+    _get_concept_name(concept_id, conn; schema="main", dialect=:postgresql) -> String
 
 Retrieves the human-readable name for a given OMOP concept ID.
 
@@ -30,14 +30,14 @@ Retrieves the human-readable name for a given OMOP concept ID.
 
 # Examples
 ```julia
-name = get_concept_name(8507, conn)
+name = _get_concept_name(8507, conn)
 # Returns: "Male"
 
-name = get_concept_name(999999, conn) 
+name = _get_concept_name(999999, conn) 
 # Returns: "Unknown"
 ```
 """
-function get_concept_name(concept_id, conn; schema="main", dialect=:postgresql)
+function _get_concept_name(concept_id, conn; schema="main", dialect=:postgresql)
     fconn = _funsql(conn; schema=schema, dialect=dialect)
     concept_table = _resolve_table(fconn, :concept)
     
@@ -50,7 +50,7 @@ function get_concept_name(concept_id, conn; schema="main", dialect=:postgresql)
 end
 
 """
-    get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main", dialect=:postgresql) -> Dict{String, Vector{Int}}
+    _get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main", dialect=:postgresql) -> Dict{String, Vector{Int}}
 
 Groups a list of OMOP concept IDs by their domain classification.
 
@@ -71,11 +71,11 @@ This function queries the concept table to determine which domain each concept b
 # Examples
 ```julia
 concepts = [201820, 192671, 1503297]
-domains = get_concepts_by_domain(concepts, conn)
+domains = _get_concepts_by_domain(concepts, conn)
 # Returns: Dict("Condition" => [201820, 192671], "Drug" => [1503297])
 ```
 """
-function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main", dialect=:postgresql)
+function _get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="main", dialect=:postgresql)
     fconn = _funsql(conn; schema=schema, dialect=dialect)
     concept_table = _resolve_table(fconn, :concept)
     
@@ -102,7 +102,7 @@ function get_concepts_by_domain(concept_ids::Vector{<:Integer}, conn; schema="ma
 end
 
 """
-    domain_to_table(domain::Symbol) -> Symbol
+    _domain_to_table(domain::Symbol) -> Symbol
 
 Maps a domain symbol to its corresponding database table symbol using the DOMAIN_TABLE lookup.
 
@@ -117,11 +117,11 @@ Maps a domain symbol to its corresponding database table symbol using the DOMAIN
 
 # Examples
 ```julia
-table = domain_to_table(:condition)
+table = _domain_to_table(:condition)
 # Returns: :condition_occurrence
 ```
 """
-function domain_to_table(domain::Symbol)
+function _domain_to_table(domain::Symbol)
     haskey(DOMAIN_TABLE, domain) || throw(ArgumentError("Unknown domain: $domain"))
     return DOMAIN_TABLE[domain]
 end
@@ -273,7 +273,7 @@ function _setup_domain_query(conn; domain::Symbol, schema::String="main", dialec
 end
 
 """
-    format_number(n) -> String
+    _format_number(n) -> String
 
 Formats a number into a human-readable string with appropriate scaling.
 
@@ -290,13 +290,13 @@ This utility function formats numbers using common abbreviations:
 
 # Examples
 ```julia
-format_number(1234567)  # Returns: "1.2M"
-format_number(5432)     # Returns: "5.4K" 
-format_number(123)      # Returns: "123"
-format_number(0.5)      # Returns: "1"
+_format_number(1234567)  # Returns: "1.2M"
+_format_number(5432)     # Returns: "5.4K" 
+_format_number(123)      # Returns: "123"
+_format_number(0.5)      # Returns: "1"
 ```
 """
-function format_number(n)
+function _format_number(n)
     if n >= 1_000_000
         return "$(round(n/1_000_000, digits=1))M"
     elseif n >= 1_000
@@ -307,9 +307,9 @@ function format_number(n)
 end
 
 """
-    domain_id_to_table(domain_id::String) -> Symbol
+    _domain_id_to_table(domain_id::String) -> Symbol
 
-Map OMOP domain_id strings to their corresponding database table symbols.
+Maps OMOP domain_id strings to their corresponding database table symbols.
 
 This function provides the mapping between OMOP domain classifications and the actual
 database tables where those concepts are stored. It includes special handling for
@@ -323,17 +323,17 @@ person-related domains and falls back to a naming convention for unknown domains
 
 # Examples
 ```julia
-table = domain_id_to_table("Condition")
+table = _domain_id_to_table("Condition")
 # Returns: :condition_occurrence
 
-table = domain_id_to_table("Gender") 
+table = _domain_id_to_table("Gender") 
 # Returns: :person
 
-table = domain_id_to_table("CustomDomain")
+table = _domain_id_to_table("CustomDomain")
 # Returns: :customdomain_occurrence
 ```
 """
-function domain_id_to_table(domain_id::String)
+function _domain_id_to_table(domain_id::String)
     domain_mapping = Dict(
         "Condition" => :condition_occurrence,
         "Drug" => :drug_exposure,

@@ -1,55 +1,55 @@
-@testset "get_concept_name" begin
-    result = OMOPCDMFeasibility.get_concept_name(8507, TEST_CONN; schema="main", dialect=:sqlite)
+@testset "_get_concept_name" begin
+    result = OMOPCDMFeasibility._get_concept_name(8507, TEST_CONN; schema="main", dialect=:sqlite)
     @test result isa String
     @test result != "Unknown"
 
-    result = OMOPCDMFeasibility.get_concept_name(999999999, TEST_CONN; schema="main", dialect=:sqlite)
+    result = OMOPCDMFeasibility._get_concept_name(999999999, TEST_CONN; schema="main", dialect=:sqlite)
     @test result == "Unknown"
 end
 
-@testset "get_concepts_by_domain" begin
+@testset "_get_concepts_by_domain" begin
     concept_ids = [8507, 8532]
-    result = OMOPCDMFeasibility.get_concepts_by_domain(
+    result = OMOPCDMFeasibility._get_concepts_by_domain(
         concept_ids, TEST_CONN; schema="main", dialect=:sqlite
     )
     @test result isa Dict
     @test !isempty(result)
 
     # Test with empty vector
-    result_empty = OMOPCDMFeasibility.get_concepts_by_domain(
+    result_empty = OMOPCDMFeasibility._get_concepts_by_domain(
         Int[], TEST_CONN; schema="main", dialect=:sqlite
     )
     @test result_empty isa Dict
     @test isempty(result_empty)
 
     # Test with invalid concept IDs
-    result_invalid = OMOPCDMFeasibility.get_concepts_by_domain(
+    result_invalid = OMOPCDMFeasibility._get_concepts_by_domain(
         [999999999], TEST_CONN; schema="main", dialect=:sqlite
     )
     @test result_invalid isa Dict
     @test isempty(result_invalid)
 end
 
-@testset "domain_id_to_table" begin
-    @test OMOPCDMFeasibility.domain_id_to_table("Condition") == :condition_occurrence
-    @test OMOPCDMFeasibility.domain_id_to_table("Drug") == :drug_exposure
-    @test OMOPCDMFeasibility.domain_id_to_table("Procedure") == :procedure_occurrence
-    @test OMOPCDMFeasibility.domain_id_to_table("Measurement") == :measurement
-    @test OMOPCDMFeasibility.domain_id_to_table("Observation") == :observation
+@testset "_domain_id_to_table" begin
+    @test OMOPCDMFeasibility._domain_id_to_table("Condition") == :condition_occurrence
+    @test OMOPCDMFeasibility._domain_id_to_table("Drug") == :drug_exposure
+    @test OMOPCDMFeasibility._domain_id_to_table("Procedure") == :procedure_occurrence
+    @test OMOPCDMFeasibility._domain_id_to_table("Measurement") == :measurement
+    @test OMOPCDMFeasibility._domain_id_to_table("Observation") == :observation
 
-    result = OMOPCDMFeasibility.domain_id_to_table("UnknownDomain")
+    result = OMOPCDMFeasibility._domain_id_to_table("UnknownDomain")
     @test result isa Symbol
     @test String(result) == "unknowndomain_occurrence"
 end
 
-@testset "format_number" begin
-    @test OMOPCDMFeasibility.format_number(1500000) == "1.5M"
-    @test OMOPCDMFeasibility.format_number(2000000) == "2.0M"
-    @test OMOPCDMFeasibility.format_number(1500) == "1.5K"
-    @test OMOPCDMFeasibility.format_number(2000) == "2.0K"
-    @test OMOPCDMFeasibility.format_number(999) == "999"
-    @test OMOPCDMFeasibility.format_number(100) == "100"
-    @test OMOPCDMFeasibility.format_number(0) == "0"
+@testset "_format_number" begin
+    @test OMOPCDMFeasibility._format_number(1500000) == "1.5M"
+    @test OMOPCDMFeasibility._format_number(2000000) == "2.0M"
+    @test OMOPCDMFeasibility._format_number(1500) == "1.5K"
+    @test OMOPCDMFeasibility._format_number(2000) == "2.0K"
+    @test OMOPCDMFeasibility._format_number(999) == "999"
+    @test OMOPCDMFeasibility._format_number(100) == "100"
+    @test OMOPCDMFeasibility._format_number(0) == "0"
 end
 
 @testset "Internal Helper Functions" begin
@@ -66,18 +66,18 @@ end
 end
 
 @testset "Edge Cases and Error Handling" begin
-    # Test get_concept_name edge cases
-    @test OMOPCDMFeasibility.get_concept_name(0, TEST_CONN; schema="main", dialect=:sqlite) ==
+    # Test _get_concept_name edge cases
+    @test OMOPCDMFeasibility._get_concept_name(0, TEST_CONN; schema="main", dialect=:sqlite) ==
         "No matching concept"
-    @test OMOPCDMFeasibility.get_concept_name(-1, TEST_CONN; schema="main", dialect=:sqlite) == "Unknown"
+    @test OMOPCDMFeasibility._get_concept_name(-1, TEST_CONN; schema="main", dialect=:sqlite) == "Unknown"
 
-    # Test format_number with edge cases
-    @test OMOPCDMFeasibility.format_number(0.5) == "1"
-    @test OMOPCDMFeasibility.format_number(-100) == "-100"
+    # Test _format_number with edge cases
+    @test OMOPCDMFeasibility._format_number(0.5) == "1"
+    @test OMOPCDMFeasibility._format_number(-100) == "-100"
 
-    # Test domain_id_to_table with edge cases
-    @test OMOPCDMFeasibility.domain_id_to_table("") == :_occurrence
-    @test OMOPCDMFeasibility.domain_id_to_table("UPPERCASE") == :uppercase_occurrence
+    # Test _domain_id_to_table with edge cases
+    @test OMOPCDMFeasibility._domain_id_to_table("") == :_occurrence
+    @test OMOPCDMFeasibility._domain_id_to_table("UPPERCASE") == :uppercase_occurrence
 
     # Test internal function error handling
     fconn = OMOPCDMFeasibility._funsql(TEST_CONN; schema="main", dialect=:sqlite)

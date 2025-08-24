@@ -46,10 +46,11 @@
     @test result_single isa DataFrame
 end
 
-@testset "generate_feasibility_report" begin
+@testset "generate_summary" begin
     concept_ids = [201820, 192671]
 
-    result = generate_feasibility_report(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite)
+    # Test with formatted values (default)
+    result = generate_summary(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite)
     @test result isa DataFrame
     @test !isempty(result)
     @test "metric" in names(result)
@@ -58,40 +59,82 @@ end
     @test "domain" in names(result)
 
     @test eltype(result.metric) <: AbstractString
-    @test eltype(result.value) <: AbstractString
+    @test eltype(result.value) <: Union{AbstractString, Number}
     @test eltype(result.interpretation) <: AbstractString
     @test eltype(result.domain) <: AbstractString
 
+    # Check that we get only Summary domain results
+    @test all(result.domain .== "Summary")
+    
+    # Check for expected metrics
     metrics = result.metric
     @test "Total Patients" in metrics
     @test "Eligible Patients" in metrics
     @test "Total Target Records" in metrics
     @test "Population Coverage (%)" in metrics
 
-    summary_rows = result[result.domain .== "Summary", :]
-    @test nrow(summary_rows) >= 4
-
-    result_no_covariates = generate_feasibility_report(
-        TEST_CONN; concept_set=concept_ids, covariate_funcs=Function[], schema="main", dialect=:sqlite
-    )
-    @test result_no_covariates isa DataFrame
-    @test !isempty(result_no_covariates)
+    # Test with raw values
+    result_raw = generate_summary(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite, raw_values=true)
+    @test result_raw isa DataFrame
+    @test !isempty(result_raw)
+    
+    # When raw_values=true, numeric metrics should be actual numbers
+    total_patients_row = result_raw[result_raw.metric .== "Total Patients", :]
+    if !isempty(total_patients_row)
+        @test total_patients_row.value[1] isa Number
+    end
 
     # Error handling tests
-    @test_throws ArgumentError generate_feasibility_report(
+    @test_throws ArgumentError generate_summary(
         TEST_CONN; concept_set=Int[], schema="main", dialect=:sqlite
     )
 
     invalid_concepts = [999999999, 888888888]
-    result_invalid = generate_feasibility_report(
+    result_invalid = generate_summary(
         TEST_CONN; concept_set=invalid_concepts, schema="main", dialect=:sqlite
     )
     @test result_invalid isa DataFrame
-    @test "No Valid Concepts" in result_invalid.metric || nrow(result_invalid) >= 1
+    @test "No Valid Concepts" in result_invalid.metric
+end
 
-    single_concept = [201820]
-    result_single = generate_feasibility_report(
-        TEST_CONN; concept_set=single_concept, schema="main", dialect=:sqlite
+@testset "generate_domain_breakdown" begin
+    concept_ids = [201820, 192671]
+
+    # Test with formatted values (default)
+    result = generate_domain_breakdown(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite)
+    @test result isa DataFrame
+    @test "metric" in names(result)
+    @test "value" in names(result)
+    @test "interpretation" in names(result)
+    @test "domain" in names(result)
+
+    @test eltype(result.metric) <: AbstractString
+    @test eltype(result.value) <: Union{AbstractString, Number}
+    @test eltype(result.interpretation) <: AbstractString
+    @test eltype(result.domain) <: AbstractString
+
+    # Should NOT contain Summary domain (that's in generate_summary)
+    if !isempty(result)
+        @test !("Summary" in result.domain)
+        
+        # Check for domain-specific metrics
+        metrics = result.metric
+        domain_metrics = filter(m -> contains(m, " - "), metrics)
+        @test !isempty(domain_metrics)
+    end
+
+    # Test with raw values
+    result_raw = generate_domain_breakdown(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite, raw_values=true)
+    @test result_raw isa DataFrame
+
+    # Error handling tests
+    @test_throws ArgumentError generate_domain_breakdown(
+        TEST_CONN; concept_set=Int[], schema="main", dialect=:sqlite
     )
-    @test result_single isa DataFrame
+
+    invalid_concepts = [999999999, 888888888]
+    result_invalid = generate_domain_breakdown(
+        TEST_CONN; concept_set=invalid_concepts, schema="main", dialect=:sqlite
+    )
+    @test result_invalid isa DataFrame
 end

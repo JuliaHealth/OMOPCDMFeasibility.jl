@@ -43,7 +43,7 @@ function analyze_concept_distribution(
 )
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
 
-    concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
+    concepts_by_domain = _get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
 
     if isempty(concepts_by_domain)
         return DataFrame(;
@@ -55,7 +55,7 @@ function analyze_concept_distribution(
 
     for (domain_id, domain_concepts) in concepts_by_domain
         try
-            table_symbol = domain_id_to_table(domain_id)
+            table_symbol = _domain_id_to_table(domain_id)
 
             setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
 
@@ -101,61 +101,61 @@ function analyze_concept_distribution(
 end
 
 """
-    generate_feasibility_report(
+    generate_summary(
         conn;
         concept_set::Vector{<:Integer},
         covariate_funcs::AbstractVector{<:Function} = Function[],
         schema::String = "main",
-        dialect::Symbol = :postgresql
+        dialect::Symbol = :postgresql,
+        raw_values::Bool = false
     )
 
-Generates a comprehensive feasibility analysis report with automatic domain detection.
+Generates a summary of feasibility metrics for the given concept set.
 
-This function provides a complete feasibility assessment including population coverage, 
-patient eligibility, data availability across multiple domains, and demographic stratification.
+This function provides high-level summary statistics including total patients, eligible patients,
+total records, and population coverage metrics. This is useful for getting a quick overview
+of study feasibility without detailed domain breakdowns.
 
 # Arguments
 - `conn` - Database connection using DBInterface
 - `concept_set` - Vector of OMOP concept IDs to analyze; must be subtype of `Integer`
 
 # Keyword Arguments
-- `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic analysis (e.g., `GetPatientGender`, `GetPatientRace`, `GetPatientEthnicity`). Default: `Function[]`
+- `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic analysis. Default: `Function[]`
 - `schema` - Database schema name. Default: `"main"`
 - `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
+- `raw_values` - If true, returns raw numerical values; if false, returns formatted strings. Default: `false`
 
 # Returns
-- `DataFrame` - Feasibility metrics with columns: `metric`, `value`, `interpretation`, and `domain`
+- `DataFrame` - Summary metrics with columns: `metric`, `value`, `interpretation`, and `domain`
 
 # Examples
 ```julia
-# Basic feasibility analysis with automatic domain detection
-report = generate_feasibility_report(conn; concept_set=[31967, 4059650])
+# Get formatted summary (default)
+summary = generate_summary(conn; concept_set=[31967, 4059650])
 
-# With demographic stratification
-report = generate_feasibility_report(
-    conn;
-    concept_set=[31967, 4059650],
-    covariate_funcs=[GetPatientGender, GetPatientRace]
-)
+# Get raw numerical values for calculations
+summary_raw = generate_summary(conn; concept_set=[31967, 4059650], raw_values=true)
 ```
 """
-function generate_feasibility_report(
+function generate_summary(
     conn;
     concept_set::Vector{<:Integer},
     covariate_funcs::AbstractVector{<:Function}=Function[],
     schema::String="main",
     dialect::Symbol=:postgresql,
+    raw_values::Bool=false
 )
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
 
-    concepts_by_domain = get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
+    concepts_by_domain = _get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
 
     if isempty(concepts_by_domain)
         return DataFrame(;
             metric=["No Valid Concepts"],
             value=["0"],
             interpretation=["No concepts found in database"],
-            domain=["N/A"],
+            domain=["Summary"],
         )
     end
 
@@ -166,11 +166,10 @@ function generate_feasibility_report(
 
     total_records_across_domains = 0
     all_eligible_patients = Set{Int}()
-    domain_details = DataFrame()
 
     for (domain_id, domain_concepts) in concepts_by_domain
         try
-            table_symbol = domain_id_to_table(domain_id)
+            table_symbol = _domain_id_to_table(domain_id)
             setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
 
             concept_records_q = Select(:total_concept_records => Agg.count())(Group()(Where(
@@ -189,6 +188,165 @@ function generate_feasibility_report(
             total_records_across_domains += domain_records
             union!(all_eligible_patients, domain_patients)
 
+        catch e
+            @warn "Error processing domain $domain_id: $e"
+            continue
+        end
+    end
+
+    unique_patients_with_concepts = length(all_eligible_patients)
+    avg_records_per_patient = if unique_patients_with_concepts > 0
+        round(total_records_across_domains / unique_patients_with_concepts; digits=3)
+    else
+        0.0
+    end
+    population_coverage = round(
+        (unique_patients_with_concepts / total_patients) * 100; digits=3
+    )
+
+    if raw_values
+        return DataFrame(;
+            metric=[
+                "Total Patients",
+                "Eligible Patients",
+                "Total Target Records",
+                "Records per Patient",
+                "Population Coverage (%)",
+                "Domains Analyzed",
+            ],
+            value=[
+                total_patients,
+                unique_patients_with_concepts,
+                total_records_across_domains,
+                avg_records_per_patient,
+                population_coverage,
+                length(concepts_by_domain),
+            ],
+            interpretation=[
+                "Total patients available in the database",
+                "Patients who have ANY of your target medical concepts",
+                "Number of medical records found across all domains",
+                "Average medical records per eligible patient",
+                "What percentage of all patients are eligible for your study",
+                "Number of different medical domains analyzed",
+            ],
+            domain=fill("Summary", 6),
+        )
+    else
+        return DataFrame(;
+            metric=[
+                "Total Patients",
+                "Eligible Patients",
+                "Total Target Records",
+                "Records per Patient",
+                "Population Coverage (%)",
+                "Domains Analyzed",
+            ],
+            value=[
+                _format_number(total_patients),
+                _format_number(unique_patients_with_concepts),
+                _format_number(total_records_across_domains),
+                string(avg_records_per_patient),
+                string(population_coverage) * "%",
+                string(length(concepts_by_domain)),
+            ],
+            interpretation=[
+                "Total patients available in the database",
+                "Patients who have ANY of your target medical concepts",
+                "Number of medical records found across all domains",
+                "Average medical records per eligible patient",
+                "What percentage of all patients are eligible for your study",
+                "Number of different medical domains analyzed",
+            ],
+            domain=fill("Summary", 6),
+        )
+    end
+end
+
+"""
+    generate_domain_breakdown(
+        conn;
+        concept_set::Vector{<:Integer},
+        covariate_funcs::AbstractVector{<:Function} = Function[],
+        schema::String = "main",
+        dialect::Symbol = :postgresql,
+        raw_values::Bool = false
+    )
+
+Generates a detailed breakdown of feasibility metrics by medical domain.
+
+This function provides domain-specific statistics showing concepts, patients, records,
+and coverage for each medical domain in the concept set. This is useful for understanding
+which domains contribute most to study feasibility.
+
+# Arguments
+- `conn` - Database connection using DBInterface
+- `concept_set` - Vector of OMOP concept IDs to analyze; must be subtype of `Integer`
+
+# Keyword Arguments
+- `covariate_funcs` - Vector of OMOPCDMCohortCreator functions for demographic analysis. Default: `Function[]`
+- `schema` - Database schema name. Default: `"main"`
+- `dialect` - Database dialect. Default: `:postgresql` (for DuckDB compatibility)
+- `raw_values` - If true, returns raw numerical values; if false, returns formatted strings. Default: `false`
+
+# Returns
+- `DataFrame` - Domain-specific metrics with columns: `metric`, `value`, `interpretation`, and `domain`
+
+# Examples
+```julia
+# Get formatted breakdown (default)
+breakdown = generate_domain_breakdown(conn; concept_set=[31967, 4059650])
+
+# Get raw numerical values for calculations
+breakdown_raw = generate_domain_breakdown(conn; concept_set=[31967, 4059650], raw_values=true)
+```
+"""
+function generate_domain_breakdown(
+    conn;
+    concept_set::Vector{<:Integer},
+    covariate_funcs::AbstractVector{<:Function}=Function[],
+    schema::String="main",
+    dialect::Symbol=:postgresql,
+    raw_values::Bool=false
+)
+    isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
+
+    concepts_by_domain = _get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
+
+    if isempty(concepts_by_domain)
+        return DataFrame(;
+            metric=String[],
+            value=String[],
+            interpretation=String[],
+            domain=String[],
+        )
+    end
+
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
+    person_table = _resolve_table(fconn, :person)
+    total_patients_q = Select(:total_patients => Agg.count())(Group()(From(person_table)))
+    total_patients = DataFrame(DBInterface.execute(fconn, total_patients_q)).total_patients[1]
+
+    domain_details = DataFrame()
+
+    for (domain_id, domain_concepts) in concepts_by_domain
+        try
+            table_symbol = _domain_id_to_table(domain_id)
+            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
+
+            concept_records_q = Select(:total_concept_records => Agg.count())(Group()(Where(
+                Fun.in(Get(setup.concept_col), domain_concepts...)
+            )(From(setup.tbl))))
+            domain_records = DataFrame(DBInterface.execute(setup.fconn, concept_records_q)).total_concept_records[1]
+
+            unique_patients_q = Select(Get(:person_id))(Where(
+                Fun.in(Get(setup.concept_col), domain_concepts...)
+            )(From(setup.tbl)))
+            domain_patients_df = DataFrame(
+                DBInterface.execute(setup.fconn, unique_patients_q)
+            )
+            domain_patients = Set(domain_patients_df.person_id)
+
             push!(
                 domain_details,
                 (
@@ -206,71 +364,58 @@ function generate_feasibility_report(
         end
     end
 
-    unique_patients_with_concepts = length(all_eligible_patients)
-    avg_records_per_patient = if unique_patients_with_concepts > 0
-        round(total_records_across_domains / unique_patients_with_concepts; digits=3)
-    else
-        0.0
-    end
-    population_coverage = round(
-        (unique_patients_with_concepts / total_patients) * 100; digits=3
-    )
-
-    summary_report = DataFrame(;
-        metric=[
-            "Total Patients",
-            "Eligible Patients",
-            "Total Target Records",
-            "Records per Patient",
-            "Population Coverage (%)",
-            "Domains Analyzed",
-        ],
-        value=[
-            format_number(total_patients),
-            format_number(unique_patients_with_concepts),
-            format_number(total_records_across_domains),
-            string(avg_records_per_patient),
-            string(population_coverage) * "%",
-            string(length(concepts_by_domain)),
-        ],
-        interpretation=[
-            "Total patients available in the database",
-            "Patients who have ANY of your target medical concepts",
-            "Number of medical records found across all domains",
-            "Average medical records per eligible patient",
-            "What percentage of all patients are eligible for your study",
-            "Number of different medical domains analyzed",
-        ],
-        domain=fill("Summary", 6),
-    )
-
     domain_breakdown = DataFrame()
     for row in eachrow(domain_details)
         domain_coverage = round((row.patients / total_patients) * 100; digits=3)
-        domain_metrics = DataFrame(;
-            metric=[
-                "$(row.domain) - Concepts",
-                "$(row.domain) - Patients",
-                "$(row.domain) - Records",
-                "$(row.domain) - Coverage (%)",
-            ],
-            value=[
-                string(row.concepts),
-                format_number(row.patients),
-                format_number(row.records),
-                string(domain_coverage) * "%",
-            ],
-            interpretation=[
-                "Number of concepts analyzed in $(row.domain) domain",
-                "Patients with $(row.domain) concepts",
-                "Records found in $(row.domain) domain",
-                "Population coverage for $(row.domain) domain",
-            ],
-            domain=fill(row.domain, 4),
-        )
+        
+        if raw_values
+            domain_metrics = DataFrame(;
+                metric=[
+                    "$(row.domain) - Concepts",
+                    "$(row.domain) - Patients",
+                    "$(row.domain) - Records",
+                    "$(row.domain) - Coverage (%)",
+                ],
+                value=[
+                    row.concepts,
+                    row.patients,
+                    row.records,
+                    domain_coverage,
+                ],
+                interpretation=[
+                    "Number of concepts analyzed in $(row.domain) domain",
+                    "Patients with $(row.domain) concepts",
+                    "Records found in $(row.domain) domain",
+                    "Population coverage for $(row.domain) domain",
+                ],
+                domain=fill(row.domain, 4),
+            )
+        else
+            domain_metrics = DataFrame(;
+                metric=[
+                    "$(row.domain) - Concepts",
+                    "$(row.domain) - Patients",
+                    "$(row.domain) - Records",
+                    "$(row.domain) - Coverage (%)",
+                ],
+                value=[
+                    string(row.concepts),
+                    _format_number(row.patients),
+                    _format_number(row.records),
+                    string(domain_coverage) * "%",
+                ],
+                interpretation=[
+                    "Number of concepts analyzed in $(row.domain) domain",
+                    "Patients with $(row.domain) concepts",
+                    "Records found in $(row.domain) domain",
+                    "Population coverage for $(row.domain) domain",
+                ],
+                domain=fill(row.domain, 4),
+            )
+        end
         domain_breakdown = vcat(domain_breakdown, domain_metrics)
     end
 
-    return vcat(summary_report, domain_breakdown)
+    return domain_breakdown
 end
 

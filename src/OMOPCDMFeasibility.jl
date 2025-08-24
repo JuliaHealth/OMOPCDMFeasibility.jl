@@ -21,6 +21,6 @@ using Serialization
 include("utils.jl")
 include("precohort.jl")
 
-export analyze_concept_distribution, generate_feasibility_report
+export analyze_concept_distribution, generate_summary, generate_domain_breakdown
 
 end
