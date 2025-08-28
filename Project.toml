@@ -4,18 +4,31 @@ authors = ["Kosuri Lakshmi Indu <kosurilindu@gmail.com> and contributors"]
 version = "0.0.1"
 
 [deps]
+DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FunSQL = "cf6cc811-59f4-4a10-b258-a8547a8f6407"
-HealthBase = "94e1309d-ccf4-42de-905f-515f1d7b1cae"
+InlineStrings = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
+JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 OMOPCommonDataModel = "ba65db9e-6590-4054-ab8a-101ed9124986"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 
 [compat]
-FunSQL = "0.15.0"
-HealthBase = "2.0.0"
-OMOPCommonDataModel = "0.1.4"
+DBInterface = "2.6.1"
+DataFrames = "1.7.0"
+FunSQL = "0.10, 0.11, 0.12, 0.13"
+InlineStrings = "1.4.4"
+JuliaFormatter = "2.1.6"
+OMOPCommonDataModel = "0.1"
+PrettyTables = "2.4.0"
 julia = "1.10"
 
 [extras]
+DataDeps = "124859b0-ceae-595e-8997-d05f6a7a8dfe"
+HealthSampleData = "b8464e9a-ae38-46a4-977b-86f00930f698"
+OMOPCDMCohortCreator = "f525a15e-a73f-4eef-870f-f901257eae22"
+SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "HealthSampleData", "SQLite", "OMOPCDMCohortCreator", "DataDeps"]
