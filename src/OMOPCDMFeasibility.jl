@@ -1,16 +1,26 @@
-__precompile__(false)
-
 module OMOPCDMFeasibility
 
 using DataFrames
 using DBInterface
-using FunSQL: SQLConnection, reflect, FunSQL, From, Get, Select, Where, Fun
-using OMOPCDMCohortCreator
+using FunSQL:
+    FunSQL,
+    Agg,
+    Fun,
+    From,
+    Get,
+    Group,
+    Join,
+    LeftJoin,
+    Select,
+    Where,
+    SQLConnection,
+    reflect
+using OMOPCommonDataModel
 
 include("utils.jl")
+include("precohort.jl")
 include("postcohort.jl")
 
-export create_individual_profiles,
-       create_cartesian_profiles
+export analyze_concept_distribution, generate_summary, generate_domain_breakdown, create_individual_profiles, create_cartesian_profiles
 
 end

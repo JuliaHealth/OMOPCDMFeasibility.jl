@@ -7,30 +7,23 @@
         schema::String = "dbt_synthea_dev"
     )
 
-Create individual demographic profile tables for a cohort by analyzing each covariate separately.
+Creates individual demographic profile tables for a cohort by analyzing each covariate separately.
 
 This function generates separate DataFrames for each demographic covariate (e.g., gender, race, age group),
 providing detailed statistics including cohort and database-level percentages for post-cohort feasibility analysis.
 Results are sorted alphabetically by covariate values for consistent, readable output.
 
 # Arguments
-- `cohort_definition_id::Union{Int, Nothing}`: ID of the cohort definition in the cohort table. 
-  Either this or `cohort_df` must be provided.
-- `cohort_df::Union{DataFrame, Nothing}`: DataFrame containing cohort with `person_id` column. 
-  Either this or `cohort_definition_id` must be provided.
-- `conn`: Database connection object compatible with DBInterface
-- `covariate_funcs::AbstractVector{<:Function}`: Vector of covariate functions from OMOPCDMCohortCreator 
-  (e.g., `GetPatientGender`, `GetPatientRace`, `GetPatientAgeGroup`)
-- `schema::String`: Database schema name (default: `"dbt_synthea_dev"`)
+- `conn` - Database connection using DBInterface
+- `covariate_funcs` - Vector of covariate functions from OMOPCDMCohortCreator (e.g., `GetPatientGender`, `GetPatientRace`)
+
+# Keyword Arguments
+- `cohort_definition_id` - ID of the cohort definition in the cohort table (or nothing). Either this or `cohort_df` must be provided
+- `cohort_df` - DataFrame containing cohort with `person_id` column (or nothing). Either this or `cohort_definition_id` must be provided  
+- `schema` - Database schema name. Default: `"dbt_synthea_dev"`
 
 # Returns
-`NamedTuple`: Named tuple with keys corresponding to covariate names, each containing a DataFrame with columns:
-- Covariate-specific column (e.g., `gender`, `race`, `age_group`): String values of the covariate categories
-- `cohort_numerator::Int64`: Number of people with this covariate value in the cohort
-- `cohort_denominator::Int64`: Total number of people in the cohort
-- `database_denominator::Int64`: Total number of people in the database
-- `percent_cohort::Float64`: Percentage within the cohort (cohort_numerator / cohort_denominator * 100)
-- `percent_database::Float64`: Percentage within the database (cohort_numerator / database_denominator * 100)
+- `NamedTuple` - Named tuple with keys corresponding to covariate names, each containing a DataFrame with covariate categories and statistics
 
 # Examples
 ```julia
@@ -39,6 +32,8 @@ individual_profiles = create_individual_profiles(
     conn = conn,
     covariate_funcs = [GetPatientGender, GetPatientRace, GetPatientAgeGroup]
 )
+```
+"""
 ```
 """
 function create_individual_profiles(;
@@ -93,37 +88,34 @@ end
         schema::String = "dbt_synthea_dev"
     )
 
-Create Cartesian product demographic profiles for a cohort by analyzing all combinations of covariates.
+Creates Cartesian product demographic profiles for a cohort by analyzing all combinations of covariates.
 
 This function generates a single DataFrame containing all possible combinations of demographic 
-covariates (e.g., gender * race * age_group), providing comprehensive cross-tabulated statistics 
+covariates (e.g., gender × race × age_group), providing comprehensive cross-tabulated statistics 
 for detailed post-cohort feasibility analysis. Column order matches the input `covariate_funcs` order,
 and results are sorted by covariate values for interpretable output.
 
 # Arguments
-- `cohort_definition_id::Union{Int, Nothing}`: ID of the cohort definition in the cohort table. 
-  Either this or `cohort_df` must be provided.
-- `cohort_df::Union{DataFrame, Nothing}`: DataFrame containing cohort with `person_id` column. 
-  Either this or `cohort_definition_id` must be provided.
-- `conn`: Database connection object compatible with DBInterface
-- `covariate_funcs::AbstractVector{<:Function}`: Vector of covariate functions from OMOPCDMCohortCreator 
-  (e.g., `GetPatientGender`, `GetPatientRace`, `GetPatientAgeGroup`). Must contain at least 2 functions.
-- `schema::String`: Database schema name (default: `"dbt_synthea_dev"`)
+- `conn` - Database connection using DBInterface
+- `covariate_funcs` - Vector of covariate functions from OMOPCDMCohortCreator (must contain at least 2 functions)
+
+# Keyword Arguments
+- `cohort_definition_id` - ID of the cohort definition in the cohort table (or nothing). Either this or `cohort_df` must be provided
+- `cohort_df` - DataFrame containing cohort with `person_id` column (or nothing). Either this or `cohort_definition_id` must be provided
+- `schema` - Database schema name. Default: `"dbt_synthea_dev"`
 
 # Returns
-`DataFrame`: Single DataFrame with all covariate combinations, containing columns:
-- Individual covariate columns (e.g., `age_group`, `gender`, `race`): String values ordered to match `covariate_funcs` input
-- `cohort_numerator::Int64`: Number of people matching this combination in the cohort
-- `cohort_denominator::Int64`: Total number of people in the cohort (constant across all rows)
-- `database_denominator::Int64`: Total number of people in the database (constant across all rows)
-- `percent_cohort::Float64`: Percentage within the cohort (cohort_numerator / cohort_denominator * 100)
-- `percent_database::Float64`: Percentage within the database (cohort_numerator / database_denominator * 100)
+- `DataFrame` - Cross-tabulated profile table with all covariate combinations and statistics
 
 # Examples
 ```julia
 cartesian_profiles = create_cartesian_profiles(
     cohort_df = my_cohort_df,
     conn = conn,
+    covariate_funcs = [GetPatientAgeGroup, GetPatientGender, GetPatientRace]
+)
+```
+"""
     covariate_funcs = [GetPatientAgeGroup, GetPatientGender, GetPatientRace]
 )
 ```
