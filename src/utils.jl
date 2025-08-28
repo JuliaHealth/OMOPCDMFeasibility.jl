@@ -268,12 +268,7 @@ Get the human-readable category name for a covariate value.
 """
 function _get_category_name(value, col, conn; schema::String="dbt_synthea_dev", dialect=:postgresql)
     if isa(value, Integer) && string(col) != "person_id"
-        try
-            return _get_concept_name(value, conn; schema=schema, dialect=dialect)
-        catch
-            @warn "Could not retrieve concept name for concept_id $value, using ID as string"
-            return string(value)
-        end
+        return _get_concept_name(value, conn; schema=schema, dialect=dialect)
     else
         return string(value)
     end

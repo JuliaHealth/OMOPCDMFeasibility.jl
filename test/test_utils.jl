@@ -177,12 +177,12 @@ end
         missing_df = DataFrame(person_id=[missing, missing, missing])
         @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe(missing_df)
         
-        # Test _get_category_name with invalid concept_id (lines 274-275)
-        # Since _get_concept_name returns "Unknown" for invalid IDs, we get "Unknown" not the string ID
+        # Test _get_category_name with invalid concept_id
+        # Since _get_concept_name returns "Unknown" for invalid IDs, we get "Unknown"
         invalid_result = OMOPCDMFeasibility._get_category_name(999999999, :invalid_concept_id, TEST_CONN; schema="main", dialect=:sqlite)
         @test invalid_result == "Unknown"  # _get_concept_name returns "Unknown" for invalid IDs
         
-        # Test _get_category_name with string input (line 277)
+        # Test _get_category_name with string input
         string_result = OMOPCDMFeasibility._get_category_name("test_string", :some_column, TEST_CONN; schema="main", dialect=:sqlite)
         @test string_result == "test_string"
     end

@@ -57,11 +57,6 @@ function create_individual_profiles(;
     person_ids = _get_cohort_person_ids(cohort_definition_id, cohort_df, conn; schema=schema, dialect=dialect)
     cohort_size = length(person_ids)
     
-    if cohort_size == 0
-        @warn "Cohort is empty - no analysis will be performed"
-        return NamedTuple()
-    end
-    
     database_size = _get_database_total_patients(conn; schema=schema, dialect=dialect)
     
     _funcs = [Base.Fix2(fun, conn) for fun in covariate_funcs]
@@ -141,11 +136,6 @@ function create_cartesian_profiles(;
     
     person_ids = _get_cohort_person_ids(cohort_definition_id, cohort_df, conn; schema=schema, dialect=dialect)
     cohort_size = length(person_ids)
-    
-    if cohort_size == 0
-        @warn "Cohort is empty - no analysis will be performed"
-        return DataFrame()
-    end
     
     database_size = _get_database_total_patients(conn; schema=schema, dialect=dialect)
     
