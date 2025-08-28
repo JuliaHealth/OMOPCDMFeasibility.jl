@@ -45,10 +45,9 @@
     
     # Test empty cohort
     empty_cohort_df = DataFrame(person_id=Int[])
-    result_empty = @test_logs (:warn, "Cohort is empty - no analysis will be performed") create_individual_profiles(
+    @test_throws ArgumentError create_individual_profiles(
         cohort_df=empty_cohort_df, conn=TEST_CONN, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
     )
-    @test result_empty isa NamedTuple && length(result_empty) == 0
 end
 
 @testset "create_cartesian_profiles" begin
@@ -63,7 +62,7 @@ end
         dialect=:sqlite
     )
     @test result isa DataFrame
-    @test :gender in names(result) && :race in names(result)
+    @test "gender" in names(result) && "race" in names(result)
     @test all(result.cohort_denominator .== 5)
     
     # Test error cases
@@ -76,10 +75,9 @@ end
     
     # Test empty cohort
     empty_cohort_df = DataFrame(person_id=Int[])
-    result_empty = @test_logs (:warn, "Cohort is empty - no analysis will be performed") create_cartesian_profiles(
+    @test_throws ArgumentError create_cartesian_profiles(
         cohort_df=empty_cohort_df, conn=TEST_CONN, covariate_funcs=[occ.GetPatientGender, occ.GetPatientRace], schema="main", dialect=:sqlite
     )
-    @test result_empty isa DataFrame && nrow(result_empty) == 0
 end
 
 @testset "Edge Cases and Integration" begin

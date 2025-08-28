@@ -130,8 +130,8 @@ end
             test_df, :gender_concept_id, 4, 1000, TEST_CONN; schema="main", dialect=:sqlite
         )
         @test result isa DataFrame
-        @test :gender in names(result)
-        @test :cohort_numerator in names(result)
+        @test "gender" in names(result)
+        @test "cohort_numerator" in names(result)
     end
     
     @testset "_create_cartesian_profile_table" begin
@@ -145,8 +145,8 @@ end
             test_df, cols, 4, 1000, TEST_CONN; schema="main", dialect=:sqlite
         )
         @test result isa DataFrame
-        @test :gender in names(result)
-        @test :race in names(result)
+        @test "gender" in names(result)
+        @test "race" in names(result)
     end
     
     @testset "_build_cartesian_row" begin
