@@ -103,3 +103,27 @@ end
         cohort_df=invalid_df, conn=TEST_CONN, covariate_funcs=[occ.GetPatientGender, occ.GetPatientRace], schema="main", dialect=:sqlite
     )
 end
+
+@testset "Empty Cohort Warning Paths" begin
+    empty_cohort_df = DataFrame(person_id=Int[])
+    
+    try
+        create_individual_profiles(
+            cohort_df=empty_cohort_df, conn=TEST_CONN, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
+        )
+        @test false  
+    catch e
+        @test e isa ArgumentError
+        @test occursin("cohort_df cannot be empty", string(e))
+    end
+    
+    try
+        create_cartesian_profiles(
+            cohort_df=empty_cohort_df, conn=TEST_CONN, covariate_funcs=[occ.GetPatientGender, occ.GetPatientRace], schema="main", dialect=:sqlite
+        )
+        @test false  
+    catch e
+        @test e isa ArgumentError
+        @test occursin("cohort_df cannot be empty", string(e))
+    end
+end

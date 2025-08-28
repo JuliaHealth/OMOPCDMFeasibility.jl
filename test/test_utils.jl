@@ -160,4 +160,30 @@ end
         @test length(result) == 7  # 2 covariates + 5 stats
         @test result[end-4] == 2   # cohort_numerator
     end
+
+    @testset "Additional Error Cases" begin
+        @test_throws ArgumentError OMOPCDMFeasibility._get_cohort_person_ids(nothing, nothing, TEST_CONN; schema="main", dialect=:sqlite)
+        
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(-1, TEST_CONN; schema="main", dialect=:sqlite)
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(0, TEST_CONN; schema="main", dialect=:sqlite)
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table("invalid", TEST_CONN; schema="main", dialect=:sqlite)
+        
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(99999, TEST_CONN; schema="main", dialect=:sqlite)
+        
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe("not a dataframe")
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe([1, 2, 3])
+        
+        # Test _get_person_ids_from_dataframe with DataFrame containing only missing person_ids (line 177)
+        missing_df = DataFrame(person_id=[missing, missing, missing])
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe(missing_df)
+        
+        # Test _get_category_name with invalid concept_id (lines 274-275)
+        # Since _get_concept_name returns "Unknown" for invalid IDs, we get "Unknown" not the string ID
+        invalid_result = OMOPCDMFeasibility._get_category_name(999999999, :invalid_concept_id, TEST_CONN; schema="main", dialect=:sqlite)
+        @test invalid_result == "Unknown"  # _get_concept_name returns "Unknown" for invalid IDs
+        
+        # Test _get_category_name with string input (line 277)
+        string_result = OMOPCDMFeasibility._get_category_name("test_string", :some_column, TEST_CONN; schema="main", dialect=:sqlite)
+        @test string_result == "test_string"
+    end
 end
