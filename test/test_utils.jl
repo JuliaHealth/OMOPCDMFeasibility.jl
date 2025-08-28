@@ -94,3 +94,70 @@ end
     fconn = OMOPCDMFeasibility._funsql(TEST_CONN; schema="main", dialect=:sqlite)
     @test_throws ErrorException OMOPCDMFeasibility._resolve_table(fconn, :nonexistent_table)
 end
+
+@testset "Postcohort Internal Utility Functions" begin
+    @testset "_get_cohort_person_ids" begin
+        test_cohort_df = DataFrame(person_id=[1, 2, 3])
+        result = OMOPCDMFeasibility._get_cohort_person_ids(nothing, test_cohort_df, TEST_CONN; schema="main", dialect=:sqlite)
+        @test result isa Vector
+        @test length(result) == 3
+    end
+    
+    @testset "_get_person_ids_from_dataframe" begin
+        test_df = DataFrame(person_id=[1, 2, 3, 1])  # Test uniqueness
+        result = OMOPCDMFeasibility._get_person_ids_from_dataframe(test_df)
+        @test length(result) == 3  # Should be unique
+        @test Set(result) == Set([1, 2, 3])
+    end
+    
+    @testset "_get_category_name" begin
+        # Test with concept ID
+        result = OMOPCDMFeasibility._get_category_name(8507, :gender_concept_id, TEST_CONN; schema="main", dialect=:sqlite)
+        @test result isa String
+        
+        # Test with string value
+        result_str = OMOPCDMFeasibility._get_category_name("test", :some_column, TEST_CONN; schema="main", dialect=:sqlite)
+        @test result_str == "test"
+        
+        # Test with person_id column
+        result_person = OMOPCDMFeasibility._get_category_name(123, :person_id, TEST_CONN; schema="main", dialect=:sqlite)
+        @test result_person == "123"
+    end
+    
+    @testset "_create_individual_profile_table" begin
+        test_df = DataFrame(person_id=[1, 2, 3, 4], gender_concept_id=[8507, 8507, 8532, 8507])
+        result = OMOPCDMFeasibility._create_individual_profile_table(
+            test_df, :gender_concept_id, 4, 1000, TEST_CONN; schema="main", dialect=:sqlite
+        )
+        @test result isa DataFrame
+        @test :gender in names(result)
+        @test :cohort_numerator in names(result)
+    end
+    
+    @testset "_create_cartesian_profile_table" begin
+        test_df = DataFrame(
+            person_id=[1, 2, 3, 4],
+            gender_concept_id=[8507, 8507, 8532, 8507],
+            race_concept_id=[8527, 8516, 8527, 8516]
+        )
+        cols = [:gender_concept_id, :race_concept_id]
+        result = OMOPCDMFeasibility._create_cartesian_profile_table(
+            test_df, cols, 4, 1000, TEST_CONN; schema="main", dialect=:sqlite
+        )
+        @test result isa DataFrame
+        @test :gender in names(result)
+        @test :race in names(result)
+    end
+    
+    @testset "_build_cartesian_row" begin
+        test_row = (gender_concept_id=8507, race_concept_id=8527, cohort_numerator=2)
+        cols = [:gender_concept_id, :race_concept_id]
+        all_covariate_names = ["gender", "race"]
+        result = OMOPCDMFeasibility._build_cartesian_row(
+            test_row, cols, all_covariate_names, 4, 1000, TEST_CONN; schema="main", dialect=:sqlite
+        )
+        @test result isa Vector
+        @test length(result) == 7  # 2 covariates + 5 stats
+        @test result[end-4] == 2   # cohort_numerator
+    end
+end
