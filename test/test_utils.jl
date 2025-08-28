@@ -173,7 +173,6 @@ end
         @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe("not a dataframe")
         @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe([1, 2, 3])
         
-        # Test _get_person_ids_from_dataframe with DataFrame containing only missing person_ids (line 177)
         missing_df = DataFrame(person_id=[missing, missing, missing])
         @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe(missing_df)
         
