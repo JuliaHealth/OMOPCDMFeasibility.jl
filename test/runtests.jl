@@ -1,3 +1,4 @@
+using OMOPCDMFeasibility
 using Test
 using HealthSampleData: Eunomia
 using SQLite: DB

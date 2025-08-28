@@ -4,7 +4,9 @@
 Retrieves the human-readable name for a given OMOP concept ID.
 
 # Arguments
-- `concept_id` - The OMOP concept ID to look up
+- `concept_id` - Thfunction _get_database_total_patients(conn; schema::String="dbt_synthea_dev", dialect::Symbol=:postgresql)
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
+    person_table = _resolve_table(fconn, :person)MOP concept ID to look up
 - `conn` - Database connection using DBInterface
 
 # Keyword Arguments  
@@ -101,9 +103,9 @@ Extract person IDs from either a cohort definition ID or a cohort DataFrame.
 # Returns
 - `Vector`: Vector of unique person IDs
 """
-function _get_cohort_person_ids(cohort_definition_id, cohort_df, conn; schema::String="dbt_synthea_dev")
+function _get_cohort_person_ids(cohort_definition_id, cohort_df, conn; schema::String="dbt_synthea_dev", dialect::Symbol=:postgresql)
     if cohort_definition_id !== nothing
-        return _get_person_ids_from_cohort_table(cohort_definition_id, conn; schema=schema)
+        return _get_person_ids_from_cohort_table(cohort_definition_id, conn; schema=schema, dialect=dialect)
     elseif cohort_df !== nothing
         return _get_person_ids_from_dataframe(cohort_df)
     else
@@ -124,12 +126,12 @@ Extract person IDs from the cohort table using a cohort definition ID.
 # Returns
 - `Vector`: Vector of unique person IDs (subject_id from cohort table)
 """
-function _get_person_ids_from_cohort_table(cohort_definition_id, conn; schema::String="dbt_synthea_dev")
+function _get_person_ids_from_cohort_table(cohort_definition_id, conn; schema::String="dbt_synthea_dev", dialect::Symbol=:postgresql)
     if !isa(cohort_definition_id, Integer) || cohort_definition_id <= 0
         throw(ArgumentError("cohort_definition_id must be a positive integer"))
     end
     
-    fconn = _funsql(conn; schema=schema)
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
     cohort_table = _resolve_table(fconn, :cohort)
     
     cohort_query = From(cohort_table) |>
@@ -190,8 +192,8 @@ Get the total number of patients in the database.
 # Returns
 - `Int`: Total count of people in the person table
 """
-function _get_database_total_patients(conn; schema::String="dbt_synthea_dev")
-    fconn = _funsql(conn; schema=schema)
+function _get_database_total_patients(conn; schema::String="dbt_synthea_dev", dialect::Symbol=:postgresql)
+    fconn = _funsql(conn; schema=schema, dialect=dialect)
     person_table = _resolve_table(fconn, :person)
     
     query = From(person_table) |> Select(Fun.count())
@@ -201,7 +203,7 @@ function _get_database_total_patients(conn; schema::String="dbt_synthea_dev")
 end
 
 """
-    _create_individual_profile_table(df, col, cohort_size, database_size, conn; schema="dbt_synthea_dev")
+    _create_individual_profile_table(df, col, cohort_size, database_size, conn; schema="dbt_synthea_dev", dialect=:postgresql)
 
 Create an individual profile table for a single covariate column.
 
@@ -212,11 +214,12 @@ Create an individual profile table for a single covariate column.
 - `database_size`: Total database population size
 - `conn`: Database connection object
 - `schema`: Database schema name (default: "dbt_synthea_dev")
+- `dialect`: SQL dialect (default: :postgresql)
 
 # Returns
 - `DataFrame`: Profile table with covariate categories and statistics
 """
-function _create_individual_profile_table(df::DataFrame, col, cohort_size::Int, database_size::Int, conn; schema::String="dbt_synthea_dev")
+function _create_individual_profile_table(df::DataFrame, col, cohort_size::Int, database_size::Int, conn; schema::String="dbt_synthea_dev", dialect=:postgresql)
     grouped_data = combine(groupby(df, col), nrow => :cohort_numerator)
     
     covariate_col_name = replace(string(col), "_concept_id" => "")
@@ -230,7 +233,7 @@ function _create_individual_profile_table(df::DataFrame, col, cohort_size::Int, 
     )
     
     for row in eachrow(grouped_data)
-        category = _get_category_name(row[col], col, conn; schema=schema)
+        category = _get_category_name(row[col], col, conn; schema=schema, dialect=dialect)
         percent_cohort = round((row.cohort_numerator / cohort_size) * 100, digits=2)
         percent_database = round((row.cohort_numerator / database_size) * 100, digits=2)
         
@@ -249,7 +252,7 @@ function _create_individual_profile_table(df::DataFrame, col, cohort_size::Int, 
 end
 
 """
-    _get_category_name(value, col, conn; schema="dbt_synthea_dev")
+    _get_category_name(value, col, conn; schema="dbt_synthea_dev", dialect=:postgresql)
 
 Get the human-readable category name for a covariate value.
 
@@ -258,14 +261,15 @@ Get the human-readable category name for a covariate value.
 - `col`: The column name
 - `conn`: Database connection object
 - `schema`: Database schema name (default: "dbt_synthea_dev")
+- `dialect`: SQL dialect (default: :postgresql)
 
 # Returns
 - `String`: Human-readable category name
 """
-function _get_category_name(value, col, conn; schema::String="dbt_synthea_dev")
+function _get_category_name(value, col, conn; schema::String="dbt_synthea_dev", dialect=:postgresql)
     if isa(value, Integer) && string(col) != "person_id"
         try
-            return get_concept_name(value, conn; schema=schema)
+            return _get_concept_name(value, conn; schema=schema, dialect=dialect)
         catch
             @warn "Could not retrieve concept name for concept_id $value, using ID as string"
             return string(value)
@@ -276,7 +280,7 @@ function _get_category_name(value, col, conn; schema::String="dbt_synthea_dev")
 end
 
 """
-    _create_cartesian_profile_table(df, cols, cohort_size, database_size, conn; schema="dbt_synthea_dev")
+    _create_cartesian_profile_table(df, cols, cohort_size, database_size, conn; schema="dbt_synthea_dev", dialect=:postgresql)
 
 Create a Cartesian product profile table with all covariate combinations.
 
@@ -287,11 +291,12 @@ Create a Cartesian product profile table with all covariate combinations.
 - `database_size`: Total database population size
 - `conn`: Database connection object
 - `schema`: Database schema name (default: "dbt_synthea_dev")
+- `dialect`: SQL dialect (default: :postgresql)
 
 # Returns
 - `DataFrame`: Table with all covariate combinations and statistics
 """
-function _create_cartesian_profile_table(df::DataFrame, cols, cohort_size::Int, database_size::Int, conn; schema::String="dbt_synthea_dev")
+function _create_cartesian_profile_table(df::DataFrame, cols, cohort_size::Int, database_size::Int, conn; schema::String="dbt_synthea_dev", dialect=:postgresql)
     all_covariate_names = [replace(string(c), "_concept_id" => "") for c in cols]
     
     result_df = DataFrame()
@@ -307,7 +312,7 @@ function _create_cartesian_profile_table(df::DataFrame, cols, cohort_size::Int, 
     sort!(grouped_data, cols)
     
     for row in eachrow(grouped_data)
-        result_row = _build_cartesian_row(row, cols, all_covariate_names, cohort_size, database_size, conn; schema=schema)
+        result_row = _build_cartesian_row(row, cols, all_covariate_names, cohort_size, database_size, conn; schema=schema, dialect=dialect)
         push!(result_df, result_row)
     end
     
@@ -315,11 +320,11 @@ function _create_cartesian_profile_table(df::DataFrame, cols, cohort_size::Int, 
     return select(result_df, column_order...)
 end
 
-function _build_cartesian_row(row, cols, all_covariate_names, cohort_size::Int, database_size::Int, conn; schema::String="dbt_synthea_dev")
+function _build_cartesian_row(row, cols, all_covariate_names, cohort_size::Int, database_size::Int, conn; schema::String="dbt_synthea_dev", dialect=:postgresql)
     result_row = Vector{Any}(undef, length(all_covariate_names) + 5)
     
     for (idx, col) in enumerate(cols)
-        result_row[idx] = _get_category_name(row[col], col, conn; schema=schema)
+        result_row[idx] = _get_category_name(row[col], col, conn; schema=schema, dialect=dialect)
     end
     
     stat_start_idx = length(all_covariate_names) + 1
