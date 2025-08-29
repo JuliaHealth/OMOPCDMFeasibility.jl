@@ -1,7 +1,9 @@
 @testset "analyze_concept_distribution" begin
     concept_ids = [201820, 192671]
 
-    result = analyze_concept_distribution(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite)
+    result = analyze_concept_distribution(
+        TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite
+    )
     @test result isa DataFrame
     @test !isempty(result)
     @test "concept_id" in names(result)
@@ -17,7 +19,11 @@
     @test all(result.count .>= 0)
 
     result_with_covariates = analyze_concept_distribution(
-        TEST_CONN; concept_set=concept_ids, covariate_funcs=Function[], schema="main", dialect=:sqlite
+        TEST_CONN;
+        concept_set=concept_ids,
+        covariate_funcs=Function[],
+        schema="main",
+        dialect=:sqlite,
     )
     @test result_with_covariates isa DataFrame
     @test !isempty(result_with_covariates)
@@ -46,7 +52,11 @@
 
     # Test with covariate functions to hit the else branch
     result_with_real_covariates = analyze_concept_distribution(
-        TEST_CONN; concept_set=concept_ids, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
+        TEST_CONN;
+        concept_set=concept_ids,
+        covariate_funcs=[occ.GetPatientGender],
+        schema="main",
+        dialect=:sqlite,
     )
     @test result_with_real_covariates isa DataFrame
     @test !isempty(result_with_real_covariates)
@@ -62,7 +72,9 @@ end
     concept_ids = [201820, 192671]
 
     # Test with formatted values (default)
-    result = generate_summary(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite)
+    result = generate_summary(
+        TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite
+    )
     @test result isa DataFrame
     @test !isempty(result)
     @test "metric" in names(result)
@@ -71,13 +83,13 @@ end
     @test "domain" in names(result)
 
     @test eltype(result.metric) <: AbstractString
-    @test eltype(result.value) <: Union{AbstractString, Number}
+    @test eltype(result.value) <: Union{AbstractString,Number}
     @test eltype(result.interpretation) <: AbstractString
     @test eltype(result.domain) <: AbstractString
 
     # Check that we get only Summary domain results
     @test all(result.domain .== "Summary")
-    
+
     # Check for expected metrics
     metrics = result.metric
     @test "Total Patients" in metrics
@@ -86,10 +98,12 @@ end
     @test "Population Coverage (%)" in metrics
 
     # Test with raw values
-    result_raw = generate_summary(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite, raw_values=true)
+    result_raw = generate_summary(
+        TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite, raw_values=true
+    )
     @test result_raw isa DataFrame
     @test !isempty(result_raw)
-    
+
     # When raw_values=true, numeric metrics should be actual numbers
     total_patients_row = result_raw[result_raw.metric .== "Total Patients", :]
     if !isempty(total_patients_row)
@@ -110,7 +124,11 @@ end
 
     # Test with covariate functions to hit the else branch
     result_with_covariates = generate_summary(
-        TEST_CONN; concept_set=concept_ids, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
+        TEST_CONN;
+        concept_set=concept_ids,
+        covariate_funcs=[occ.GetPatientGender],
+        schema="main",
+        dialect=:sqlite,
     )
     @test result_with_covariates isa DataFrame
     @test !isempty(result_with_covariates)
@@ -126,7 +144,9 @@ end
     concept_ids = [201820, 192671]
 
     # Test with formatted values (default)
-    result = generate_domain_breakdown(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite)
+    result = generate_domain_breakdown(
+        TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite
+    )
     @test result isa DataFrame
     @test "metric" in names(result)
     @test "value" in names(result)
@@ -134,14 +154,14 @@ end
     @test "domain" in names(result)
 
     @test eltype(result.metric) <: AbstractString
-    @test eltype(result.value) <: Union{AbstractString, Number}
+    @test eltype(result.value) <: Union{AbstractString,Number}
     @test eltype(result.interpretation) <: AbstractString
     @test eltype(result.domain) <: AbstractString
 
     # Should NOT contain Summary domain (that's in generate_summary)
     if !isempty(result)
         @test !("Summary" in result.domain)
-        
+
         # Check for domain-specific metrics
         metrics = result.metric
         domain_metrics = filter(m -> contains(m, " - "), metrics)
@@ -149,7 +169,9 @@ end
     end
 
     # Test with raw values
-    result_raw = generate_domain_breakdown(TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite, raw_values=true)
+    result_raw = generate_domain_breakdown(
+        TEST_CONN; concept_set=concept_ids, schema="main", dialect=:sqlite, raw_values=true
+    )
     @test result_raw isa DataFrame
 
     # Error handling tests
@@ -165,7 +187,11 @@ end
 
     # Test with covariate functions to hit the else branch
     result_with_covariates = generate_domain_breakdown(
-        TEST_CONN; concept_set=concept_ids, covariate_funcs=[occ.GetPatientGender], schema="main", dialect=:sqlite
+        TEST_CONN;
+        concept_set=concept_ids,
+        covariate_funcs=[occ.GetPatientGender],
+        schema="main",
+        dialect=:sqlite,
     )
     @test result_with_covariates isa DataFrame
 

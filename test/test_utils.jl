@@ -1,9 +1,13 @@
 @testset "_get_concept_name" begin
-    result = OMOPCDMFeasibility._get_concept_name(8507, TEST_CONN; schema="main", dialect=:sqlite)
+    result = OMOPCDMFeasibility._get_concept_name(
+        8507, TEST_CONN; schema="main", dialect=:sqlite
+    )
     @test result isa String
     @test result != "Unknown"
 
-    result = OMOPCDMFeasibility._get_concept_name(999999999, TEST_CONN; schema="main", dialect=:sqlite)
+    result = OMOPCDMFeasibility._get_concept_name(
+        999999999, TEST_CONN; schema="main", dialect=:sqlite
+    )
     @test result == "Unknown"
 end
 
@@ -68,19 +72,22 @@ end
 @testset "_concept_col tests" begin
     # Test condition domain
     @test OMOPCDMFeasibility._concept_col(:condition_occurrence) == :condition_concept_id
-    
+
     # Test person domain - this should hit the special case
     @test OMOPCDMFeasibility._concept_col(:person) == :gender_concept_id
-    
+
     # Test unknown domain - this should hit the generic case
     @test OMOPCDMFeasibility._concept_col(:unknown_table) == :unknown_concept_id
 end
 
 @testset "Edge Cases and Error Handling" begin
     # Test _get_concept_name edge cases
-    @test OMOPCDMFeasibility._get_concept_name(0, TEST_CONN; schema="main", dialect=:sqlite) ==
-        "No matching concept"
-    @test OMOPCDMFeasibility._get_concept_name(-1, TEST_CONN; schema="main", dialect=:sqlite) == "Unknown"
+    @test OMOPCDMFeasibility._get_concept_name(
+        0, TEST_CONN; schema="main", dialect=:sqlite
+    ) == "No matching concept"
+    @test OMOPCDMFeasibility._get_concept_name(
+        -1, TEST_CONN; schema="main", dialect=:sqlite
+    ) == "Unknown"
 
     # Test _format_number with edge cases
     @test OMOPCDMFeasibility._format_number(0.5) == "1"
@@ -98,34 +105,44 @@ end
 @testset "Postcohort Internal Utility Functions" begin
     @testset "_get_cohort_person_ids" begin
         test_cohort_df = DataFrame(person_id=[1, 2, 3])
-        result = OMOPCDMFeasibility._get_cohort_person_ids(nothing, test_cohort_df, TEST_CONN; schema="main", dialect=:sqlite)
+        result = OMOPCDMFeasibility._get_cohort_person_ids(
+            nothing, test_cohort_df, TEST_CONN; schema="main", dialect=:sqlite
+        )
         @test result isa Vector
         @test length(result) == 3
     end
-    
+
     @testset "_get_person_ids_from_dataframe" begin
         test_df = DataFrame(person_id=[1, 2, 3, 1])  # Test uniqueness
         result = OMOPCDMFeasibility._get_person_ids_from_dataframe(test_df)
         @test length(result) == 3  # Should be unique
         @test Set(result) == Set([1, 2, 3])
     end
-    
+
     @testset "_get_category_name" begin
         # Test with concept ID
-        result = OMOPCDMFeasibility._get_category_name(8507, :gender_concept_id, TEST_CONN; schema="main", dialect=:sqlite)
+        result = OMOPCDMFeasibility._get_category_name(
+            8507, :gender_concept_id, TEST_CONN; schema="main", dialect=:sqlite
+        )
         @test result isa String
-        
+
         # Test with string value
-        result_str = OMOPCDMFeasibility._get_category_name("test", :some_column, TEST_CONN; schema="main", dialect=:sqlite)
+        result_str = OMOPCDMFeasibility._get_category_name(
+            "test", :some_column, TEST_CONN; schema="main", dialect=:sqlite
+        )
         @test result_str == "test"
-        
+
         # Test with person_id column
-        result_person = OMOPCDMFeasibility._get_category_name(123, :person_id, TEST_CONN; schema="main", dialect=:sqlite)
+        result_person = OMOPCDMFeasibility._get_category_name(
+            123, :person_id, TEST_CONN; schema="main", dialect=:sqlite
+        )
         @test result_person == "123"
     end
-    
+
     @testset "_create_individual_profile_table" begin
-        test_df = DataFrame(person_id=[1, 2, 3, 4], gender_concept_id=[8507, 8507, 8532, 8507])
+        test_df = DataFrame(
+            person_id=[1, 2, 3, 4], gender_concept_id=[8507, 8507, 8532, 8507]
+        )
         result = OMOPCDMFeasibility._create_individual_profile_table(
             test_df, :gender_concept_id, 4, 1000, TEST_CONN; schema="main", dialect=:sqlite
         )
@@ -133,12 +150,12 @@ end
         @test "gender" in names(result)
         @test "cohort_numerator" in names(result)
     end
-    
+
     @testset "_create_cartesian_profile_table" begin
         test_df = DataFrame(
             person_id=[1, 2, 3, 4],
             gender_concept_id=[8507, 8507, 8532, 8507],
-            race_concept_id=[8527, 8516, 8527, 8516]
+            race_concept_id=[8527, 8516, 8527, 8516],
         )
         cols = [:gender_concept_id, :race_concept_id]
         result = OMOPCDMFeasibility._create_cartesian_profile_table(
@@ -148,41 +165,68 @@ end
         @test "gender" in names(result)
         @test "race" in names(result)
     end
-    
+
     @testset "_build_cartesian_row" begin
         test_row = (gender_concept_id=8507, race_concept_id=8527, cohort_numerator=2)
         cols = [:gender_concept_id, :race_concept_id]
         all_covariate_names = ["gender", "race"]
         result = OMOPCDMFeasibility._build_cartesian_row(
-            test_row, cols, all_covariate_names, 4, 1000, TEST_CONN; schema="main", dialect=:sqlite
+            test_row,
+            cols,
+            all_covariate_names,
+            4,
+            1000,
+            TEST_CONN;
+            schema="main",
+            dialect=:sqlite,
         )
         @test result isa Vector
         @test length(result) == 7  # 2 covariates + 5 stats
-        @test result[end-4] == 2   # cohort_numerator
+        @test result[end - 4] == 2   # cohort_numerator
     end
 
     @testset "Additional Error Cases" begin
-        @test_throws ArgumentError OMOPCDMFeasibility._get_cohort_person_ids(nothing, nothing, TEST_CONN; schema="main", dialect=:sqlite)
-        
-        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(-1, TEST_CONN; schema="main", dialect=:sqlite)
-        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(0, TEST_CONN; schema="main", dialect=:sqlite)
-        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table("invalid", TEST_CONN; schema="main", dialect=:sqlite)
-        
-        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(99999, TEST_CONN; schema="main", dialect=:sqlite)
-        
-        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe("not a dataframe")
-        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe([1, 2, 3])
-        
+        @test_throws ArgumentError OMOPCDMFeasibility._get_cohort_person_ids(
+            nothing, nothing, TEST_CONN; schema="main", dialect=:sqlite
+        )
+
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(
+            -1, TEST_CONN; schema="main", dialect=:sqlite
+        )
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(
+            0, TEST_CONN; schema="main", dialect=:sqlite
+        )
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(
+            "invalid", TEST_CONN; schema="main", dialect=:sqlite
+        )
+
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_cohort_table(
+            99999, TEST_CONN; schema="main", dialect=:sqlite
+        )
+
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe(
+            "not a dataframe"
+        )
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe([
+            1, 2, 3
+        ])
+
         missing_df = DataFrame(person_id=[missing, missing, missing])
-        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe(missing_df)
-        
+        @test_throws ArgumentError OMOPCDMFeasibility._get_person_ids_from_dataframe(
+            missing_df
+        )
+
         # Test _get_category_name with invalid concept_id
         # Since _get_concept_name returns "Unknown" for invalid IDs, we get "Unknown"
-        invalid_result = OMOPCDMFeasibility._get_category_name(999999999, :invalid_concept_id, TEST_CONN; schema="main", dialect=:sqlite)
+        invalid_result = OMOPCDMFeasibility._get_category_name(
+            999999999, :invalid_concept_id, TEST_CONN; schema="main", dialect=:sqlite
+        )
         @test invalid_result == "Unknown"  # _get_concept_name returns "Unknown" for invalid IDs
-        
+
         # Test _get_category_name with string input
-        string_result = OMOPCDMFeasibility._get_category_name("test_string", :some_column, TEST_CONN; schema="main", dialect=:sqlite)
+        string_result = OMOPCDMFeasibility._get_category_name(
+            "test_string", :some_column, TEST_CONN; schema="main", dialect=:sqlite
+        )
         @test string_result == "test_string"
     end
 end
