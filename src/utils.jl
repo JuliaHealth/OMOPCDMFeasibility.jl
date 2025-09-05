@@ -3,10 +3,7 @@
 
 Retrieves the human-readable name for a given OMOP concept ID.
 
-# Arguments
-- `concept_id` - Thfunction _get_database_total_patients(conn; schema::String="dbt_synthea_dev", dialect::Symbol=:postgresql)
-    fconn = _funsql(conn; schema=schema, dialect=dialect)
-    person_table = _resolve_table(fconn, :person)MOP concept ID to look up
+- `concept_id` - OMOP concept ID to look up
 - `conn` - Database connection using DBInterface
 
 # Keyword Arguments  
@@ -100,13 +97,13 @@ end
 Extract person IDs from either a cohort definition ID or a cohort DataFrame.
 
 # Arguments
-- `cohort_definition_id`: ID of the cohort definition in the cohort table (or nothing)
-- `cohort_df`: DataFrame containing cohort with `person_id` column (or nothing)
-- `conn`: Database connection object
-- `schema`: Database schema name (default: "dbt_synthea_dev")
+- `cohort_definition_id` - ID of the cohort definition in the cohort table (or nothing)
+- `cohort_df` - DataFrame containing cohort with `person_id` column (or nothing)
+- `conn` - Database connection object
+- `schema` - Database schema name (default: "dbt_synthea_dev")
 
 # Returns
-- `Vector`: Vector of unique person IDs
+- `Vector` - Vector of unique person IDs
 """
 function _get_cohort_person_ids(
     cohort_definition_id,
@@ -132,12 +129,12 @@ end
 Extract person IDs from the cohort table using a cohort definition ID.
 
 # Arguments
-- `cohort_definition_id`: ID of the cohort definition
-- `conn`: Database connection object
-- `schema`: Database schema name (default: "dbt_synthea_dev")
+- `cohort_definition_id` - ID of the cohort definition
+- `conn` - Database connection object
+- `schema` - Database schema name (default: "dbt_synthea_dev")
 
 # Returns
-- `Vector`: Vector of unique person IDs (subject_id from cohort table)
+- `Vector` - Vector of unique person IDs (subject_id from cohort table)
 """
 function _get_person_ids_from_cohort_table(
     cohort_definition_id,
@@ -177,10 +174,10 @@ end
 Extract person IDs from a cohort DataFrame.
 
 # Arguments
-- `cohort_df`: DataFrame containing cohort with `person_id` column
+- `cohort_df` - DataFrame containing cohort with `person_id` column
 
 # Returns
-- `Vector`: Vector of unique person IDs from the DataFrame
+- `Vector` - Vector of unique person IDs from the DataFrame
 """
 function _get_person_ids_from_dataframe(cohort_df)
     if !isa(cohort_df, DataFrame)
@@ -214,11 +211,11 @@ end
 Get the total number of patients in the database.
 
 # Arguments
-- `conn`: Database connection object
-- `schema`: Database schema name (default: "dbt_synthea_dev")
+- `conn` - Database connection object
+- `schema` - Database schema name (default: "dbt_synthea_dev")
 
 # Returns
-- `Int`: Total count of people in the person table
+- `Int` - Total count of people in the person table
 """
 function _get_database_total_patients(
     conn; schema::String="dbt_synthea_dev", dialect::Symbol=:postgresql
@@ -240,16 +237,16 @@ end
 Create an individual profile table for a single covariate column.
 
 # Arguments
-- `df`: DataFrame with demographic data
-- `col`: Column name to profile
-- `cohort_size`: Total cohort size
-- `database_size`: Total database population size
-- `conn`: Database connection object
-- `schema`: Database schema name (default: "dbt_synthea_dev")
-- `dialect`: SQL dialect (default: :postgresql)
+- `df` - DataFrame with demographic data
+- `col` - Column name to profile
+- `cohort_size` - Total cohort size
+- `database_size` - Total database population size
+- `conn` - Database connection object
+- `schema` - Database schema name (default: "dbt_synthea_dev")
+- `dialect` - SQL dialect (default: :postgresql)
 
 # Returns
-- `DataFrame`: Profile table with covariate categories and statistics
+- `DataFrame` - Profile table with covariate categories and statistics
 """
 function _create_individual_profile_table(
     df::DataFrame,
@@ -300,14 +297,14 @@ end
 Get the human-readable category name for a covariate value.
 
 # Arguments
-- `value`: The value to convert (concept ID or string)
-- `col`: The column name
-- `conn`: Database connection object
-- `schema`: Database schema name (default: "dbt_synthea_dev")
-- `dialect`: SQL dialect (default: :postgresql)
+- `value` - The value to convert (concept ID or string)
+- `col` - The column name
+- `conn` - Database connection object
+- `schema` - Database schema name (default: "dbt_synthea_dev")
+- `dialect` - SQL dialect (default: :postgresql)
 
 # Returns
-- `String`: Human-readable category name
+- `String` - Human-readable category name
 """
 function _get_category_name(
     value, col, conn; schema::String="dbt_synthea_dev", dialect=:postgresql
@@ -325,16 +322,16 @@ end
 Create a Cartesian product profile table with all covariate combinations.
 
 # Arguments
-- `df`: DataFrame with demographic data
-- `cols`: Vector of column names to include in combinations
-- `cohort_size`: Total cohort size
-- `database_size`: Total database population size
-- `conn`: Database connection object
-- `schema`: Database schema name (default: "dbt_synthea_dev")
-- `dialect`: SQL dialect (default: :postgresql)
+- `df` - DataFrame with demographic data
+- `cols` - Vector of column names to include in combinations
+- `cohort_size` - Total cohort size
+- `database_size` - Total database population size
+- `conn` - Database connection object
+- `schema` - Database schema name (default: "dbt_synthea_dev")
+- `dialect` - SQL dialect (default: :postgresql)
 
 # Returns
-- `DataFrame`: Table with all covariate combinations and statistics
+- `DataFrame` - Table with all covariate combinations and statistics
 """
 function _create_cartesian_profile_table(
     df::DataFrame,
