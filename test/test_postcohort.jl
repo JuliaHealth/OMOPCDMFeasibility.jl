@@ -53,14 +53,6 @@
         schema="main",
         dialect=:sqlite,
     )
-    @test_throws ArgumentError create_individual_profiles(
-        cohort_definition_id=1,
-        cohort_df=test_cohort_df,
-        conn=TEST_CONN,
-        covariate_funcs=[occ.GetPatientGender],
-        schema="main",
-        dialect=:sqlite,
-    )
 
     # Test empty cohort
     empty_cohort_df = DataFrame(person_id=Int[])

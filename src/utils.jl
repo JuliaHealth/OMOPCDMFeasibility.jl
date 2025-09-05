@@ -3,7 +3,8 @@
 
 Retrieves the human-readable name for a given OMOP concept ID.
 
-- `concept_id` - OMOP concept ID to look up
+# Arguments
+- `concept_id` - OMOP CDM concept ID to look up
 - `conn` - Database connection using DBInterface
 
 # Keyword Arguments  
@@ -104,6 +105,10 @@ Extract person IDs from either a cohort definition ID or a cohort DataFrame.
 
 # Returns
 - `Vector` - Vector of unique person IDs
+
+# Notes
+- You must provide exactly one of `cohort_definition_id` or `cohort_df` (not both).
+- If both are provided, an error is thrown.
 """
 function _get_cohort_person_ids(
     cohort_definition_id,
@@ -112,7 +117,9 @@ function _get_cohort_person_ids(
     schema::String="dbt_synthea_dev",
     dialect::Symbol=:postgresql,
 )
-    if cohort_definition_id !== nothing
+    if cohort_definition_id !== nothing && cohort_df !== nothing
+        throw(ArgumentError("Provide only one of cohort_definition_id or cohort_df, not both."))
+    elseif cohort_definition_id !== nothing
         return _get_person_ids_from_cohort_table(
             cohort_definition_id, conn; schema=schema, dialect=dialect
         )
