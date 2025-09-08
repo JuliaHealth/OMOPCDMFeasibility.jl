@@ -15,7 +15,7 @@ function setup_test_connection()
     conn = DB(eunomia)
 
     occ.GenerateDatabaseDetails(:sqlite, "main")
-    
+
     # Force compilation and avoid world age issues
     Base.invokelatest() do
         occ.GenerateTables(conn)
@@ -37,6 +37,10 @@ try
 
     @testset "Pre-cohort Analysis" begin
         include("test_precohort.jl")
+    end
+
+    @testset "Post-cohort Analysis" begin
+        include("test_postcohort.jl")
     end
 finally
     teardown_test_connection(TEST_CONN)

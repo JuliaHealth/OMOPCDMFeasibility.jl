@@ -43,7 +43,9 @@ function analyze_concept_distribution(
 )
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
 
-    concepts_by_domain = _get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
+    concepts_by_domain = _get_concepts_by_domain(
+        concept_set, conn; schema=schema, dialect=dialect
+    )
 
     if isempty(concepts_by_domain)
         return DataFrame(;
@@ -57,18 +59,26 @@ function analyze_concept_distribution(
         try
             table_symbol = _domain_id_to_table(domain_id)
 
-            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
+            setup = _setup_domain_query(
+                conn; domain=table_symbol, schema=schema, dialect=dialect
+            )
 
-            base = Where(Fun.in(Get(setup.concept_col), domain_concepts...))(Join(
-                :main_concept => setup.concept_table,
-                Get(setup.concept_col) .== Get.main_concept.concept_id,
-            )(From(setup.tbl)))
+            base = Where(Fun.in(Get(setup.concept_col), domain_concepts...))(
+                Join(
+                    :main_concept => setup.concept_table,
+                    Get(setup.concept_col) .== Get.main_concept.concept_id,
+                )(
+                    From(setup.tbl)
+                ),
+            )
 
             q = Select(
                 Get(:person_id),
                 :concept_id => Get(setup.concept_col),
                 :concept_name => Get.main_concept.concept_name,
-            )(base)
+            )(
+                base
+            )
             base_df = DataFrame(DBInterface.execute(setup.fconn, q))
 
             if !isempty(base_df)
@@ -144,11 +154,13 @@ function generate_summary(
     covariate_funcs::AbstractVector{<:Function}=Function[],
     schema::String="main",
     dialect::Symbol=:postgresql,
-    raw_values::Bool=false
+    raw_values::Bool=false,
 )
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
 
-    concepts_by_domain = _get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
+    concepts_by_domain = _get_concepts_by_domain(
+        concept_set, conn; schema=schema, dialect=dialect
+    )
 
     if isempty(concepts_by_domain)
         return DataFrame(;
@@ -170,16 +182,22 @@ function generate_summary(
     for (domain_id, domain_concepts) in concepts_by_domain
         try
             table_symbol = _domain_id_to_table(domain_id)
-            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
+            setup = _setup_domain_query(
+                conn; domain=table_symbol, schema=schema, dialect=dialect
+            )
 
-            concept_records_q = Select(:total_concept_records => Agg.count())(Group()(Where(
-                Fun.in(Get(setup.concept_col), domain_concepts...)
-            )(From(setup.tbl))))
+            concept_records_q = Select(:total_concept_records => Agg.count())(
+                Group()(
+                    Where(Fun.in(Get(setup.concept_col), domain_concepts...))(
+                        From(setup.tbl)
+                    ),
+                ),
+            )
             domain_records = DataFrame(DBInterface.execute(setup.fconn, concept_records_q)).total_concept_records[1]
 
-            unique_patients_q = Select(Get(:person_id))(Where(
-                Fun.in(Get(setup.concept_col), domain_concepts...)
-            )(From(setup.tbl)))
+            unique_patients_q = Select(Get(:person_id))(
+                Where(Fun.in(Get(setup.concept_col), domain_concepts...))(From(setup.tbl))
+            )
             domain_patients_df = DataFrame(
                 DBInterface.execute(setup.fconn, unique_patients_q)
             )
@@ -307,18 +325,17 @@ function generate_domain_breakdown(
     covariate_funcs::AbstractVector{<:Function}=Function[],
     schema::String="main",
     dialect::Symbol=:postgresql,
-    raw_values::Bool=false
+    raw_values::Bool=false,
 )
     isempty(concept_set) && throw(ArgumentError("concept_set cannot be empty"))
 
-    concepts_by_domain = _get_concepts_by_domain(concept_set, conn; schema=schema, dialect=dialect)
+    concepts_by_domain = _get_concepts_by_domain(
+        concept_set, conn; schema=schema, dialect=dialect
+    )
 
     if isempty(concepts_by_domain)
         return DataFrame(;
-            metric=String[],
-            value=String[],
-            interpretation=String[],
-            domain=String[],
+            metric=String[], value=String[], interpretation=String[], domain=String[]
         )
     end
 
@@ -332,16 +349,22 @@ function generate_domain_breakdown(
     for (domain_id, domain_concepts) in concepts_by_domain
         try
             table_symbol = _domain_id_to_table(domain_id)
-            setup = _setup_domain_query(conn; domain=table_symbol, schema=schema, dialect=dialect)
+            setup = _setup_domain_query(
+                conn; domain=table_symbol, schema=schema, dialect=dialect
+            )
 
-            concept_records_q = Select(:total_concept_records => Agg.count())(Group()(Where(
-                Fun.in(Get(setup.concept_col), domain_concepts...)
-            )(From(setup.tbl))))
+            concept_records_q = Select(:total_concept_records => Agg.count())(
+                Group()(
+                    Where(Fun.in(Get(setup.concept_col), domain_concepts...))(
+                        From(setup.tbl)
+                    ),
+                ),
+            )
             domain_records = DataFrame(DBInterface.execute(setup.fconn, concept_records_q)).total_concept_records[1]
 
-            unique_patients_q = Select(Get(:person_id))(Where(
-                Fun.in(Get(setup.concept_col), domain_concepts...)
-            )(From(setup.tbl)))
+            unique_patients_q = Select(Get(:person_id))(
+                Where(Fun.in(Get(setup.concept_col), domain_concepts...))(From(setup.tbl))
+            )
             domain_patients_df = DataFrame(
                 DBInterface.execute(setup.fconn, unique_patients_q)
             )
@@ -367,7 +390,7 @@ function generate_domain_breakdown(
     domain_breakdown = DataFrame()
     for row in eachrow(domain_details)
         domain_coverage = round((row.patients / total_patients) * 100; digits=3)
-        
+
         if raw_values
             domain_metrics = DataFrame(;
                 metric=[
@@ -376,12 +399,7 @@ function generate_domain_breakdown(
                     "$(row.domain) - Records",
                     "$(row.domain) - Coverage (%)",
                 ],
-                value=[
-                    row.concepts,
-                    row.patients,
-                    row.records,
-                    domain_coverage,
-                ],
+                value=[row.concepts, row.patients, row.records, domain_coverage],
                 interpretation=[
                     "Number of concepts analyzed in $(row.domain) domain",
                     "Patients with $(row.domain) concepts",

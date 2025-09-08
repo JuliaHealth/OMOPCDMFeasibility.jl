@@ -19,7 +19,12 @@ using OMOPCommonDataModel
 
 include("utils.jl")
 include("precohort.jl")
+include("postcohort.jl")
 
-export analyze_concept_distribution, generate_summary, generate_domain_breakdown
+export analyze_concept_distribution,
+    generate_summary,
+    generate_domain_breakdown,
+    create_individual_profiles,
+    create_cartesian_profiles
 
 end
