@@ -55,21 +55,32 @@ concept_ids = [
     31967,    # Condition: Nausea
     1127433,  # Drug: Acetaminophen
 ]
-println("\n")
-report = OMOPCDMFeasibility.generate_feasibility_report(
-    conn;
-    concept_set=concept_ids,
-    covariate_funcs=[GetPatientGender, GetPatientRace]
-)
-display(report)
 
 println("\n")
-summary = OMOPCDMFeasibility.analyze_concept_distribution(
+distribution = OMOPCDMFeasibility.analyze_concept_distribution(
     conn;
     concept_set=concept_ids,
-    covariate_funcs=[GetPatientAgeGroup, GetPatientRace]
+    covariate_funcs=[GetPatientGender, GetPatientRace],
+    schema="dbt_synthea_dev"
+)
+display(distribution)
+
+println("\n")
+summary = OMOPCDMFeasibility.generate_summary(
+    conn;
+    concept_set=concept_ids,
+    covariate_funcs=[GetPatientAgeGroup, GetPatientRace],
+    schema="dbt_synthea_dev"
 )
 display(summary)
+
+println("\n")
+domain_breakdown = OMOPCDMFeasibility.generate_domain_breakdown(
+    conn;
+    concept_set=concept_ids,
+    schema="dbt_synthea_dev"
+)
+display(domain_breakdown)
 println()
 
 DBInterface.close!(conn)
