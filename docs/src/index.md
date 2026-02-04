@@ -1,24 +1,45 @@
-# OMOPCDMFeasibility.jl
 
-> A Julia package for feasibility and cohort analysis on OMOP Common Data Model (CDM) data.
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
 
-## Overview
+hero:
+  name: OMOPCDMFeasibility.jl
+  text:
+  tagline: Feasibility checks for OMOP CDM cohorts in Julia
+  image:    
+    src: /logo.png
+    alt: OMOPCDMFeasibility
+  actions:
+    - theme: brand
+      text: Quickstart
+      link: /quickstart
+    - theme: alt
+      text: API Reference
+      link: /api
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/JuliaHealth/OMOPCDMFeasibility.jl
+---
+```
 
-OMOPCDMFeasibility.jl helps researchers and data scientists quickly explore, summarize, and compare patient cohorts using OMOP CDM databases. It is designed for use in observational health studies, cohort discovery, and data quality assessment.
+# Welcome to OMOPCDMFeasibility.jl
 
-## Features
+OMOPCDMFeasibility.jl helps you run feasibility checks on OMOP CDM data and cohorts.
+Use it to validate inputs, summarize key cohort characteristics, and ensure your data is ready for downstream analysis.
 
-- **Pre-cohort analysis:** Explore concept distributions, domain breakdowns, and data quality before defining a cohort.
-- **Post-cohort analysis:** Summarize, profile, and compare cohorts after extraction.
-- **Flexible database support:** Works with DuckDB, SQLite, PostgreSQL, and more.
-- **Composable with JuliaHealth:** Integrates with DataFrames.jl, OMOPCommonDataModel.jl, and other JuliaHealth tools.
-- **Reproducible workflows:** Designed for robust, testable, and transparent research.
-- **Clear error handling:** Provides informative messages and input validation.
+## What you can do
 
-## Limitations
+- Run pre-cohort feasibility checks (e.g., completeness and source table readiness).
+- Run post-cohort feasibility checks (e.g., cohort size and basic summaries).
 
-- OMOPCDMFeasibility.jl is focused on feasibility and cohort analysis only; it does not perform cohort extraction or patient-level prediction itself.
-- Some advanced features (e.g., custom covariates, non-standard dialects) may require additional JuliaHealth packages or extensions.
-- The package assumes your data is already in OMOP CDM format and accessible via a supported database backend.
+## Get started
 
-For a step-by-step guide, see the [Quickstart](quickstart.md). For detailed workflows and function documentation, explore the other sections in this documentation.
+Head to the [Quickstart](quickstart.md) to set up your environment and run your first checks.
+
+## Learn more
+
+- [Pre-Cohort Analysis](precohort.md)
+- [Post-Cohort Analysis](postcohort.md)
+- [API Reference](api.md)
