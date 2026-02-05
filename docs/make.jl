@@ -1,31 +1,42 @@
 using OMOPCDMFeasibility
 using Documenter
+using DocumenterVitepress
 
 DocMeta.setdocmeta!(
-    OMOPCDMFeasibility, :DocTestSetup, :(using OMOPCDMFeasibility); recursive=true
+    OMOPCDMFeasibility,
+    :DocTestSetup,
+    :(using OMOPCDMFeasibility);
+    recursive = true
 )
 
 makedocs(;
-    modules=[OMOPCDMFeasibility],
-    checkdocs = :none,
-    authors="Kosuri Lakshmi Indu <kosurilindu@gmail.com> and contributors",
-    repo = "https://github.com/JuliaHealth/OMOPCDMFeasibility.jl/blob/{commit}{path}#{line}",
-    sitename="OMOPCDMFeasibility.jl",
-    format=Documenter.HTML(;
-        prettyurls = get(ENV, "CI", "false") == "true",
-        canonical="https://JuliaHealth.github.io/OMOPCDMFeasibility.jl",
-        assets=String[],
+    modules = [OMOPCDMFeasibility],
+    repo = Remotes.GitHub("JuliaHealth", "OMOPCDMFeasibility.jl"),
+    authors = "Kosuri Lakshmi Indu <kosurilindu@gmail.com>, and contributors",
+    sitename = "OMOPCDMFeasibility.jl",
+    format = DocumenterVitepress.MarkdownVitepress(
+        repo = "github.com/JuliaHealth/OMOPCDMFeasibility.jl",
+        devurl = "dev",
+        devbranch = "master",
+        deploy_url = "https://juliahealth.github.io/OMOPCDMFeasibility.jl",
     ),
-    pages=[
+    pages = [
         "Home" => "index.md",
+        "About" => "about.md",
         "Quickstart" => "quickstart.md",
-
         "Pre-Cohort Analysis" => "precohort.md",
         "Post-Cohort Analysis" => "postcohort.md",
-        
         "API" => "api.md",
     ],
+    checkdocs = :none,
     doctest = false,
+    warnonly = true,
 )
 
-deploydocs(; repo="github.com/JuliaHealth/OMOPCDMFeasibility.jl")
+DocumenterVitepress.deploydocs(;
+    repo = "github.com/JuliaHealth/OMOPCDMFeasibility.jl",
+    target = "build",      
+    devbranch = "master",
+    branch = "gh-pages",
+    push_preview = true,
+)
