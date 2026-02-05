@@ -11,14 +11,12 @@ DocMeta.setdocmeta!(
 
 makedocs(;
     modules = [OMOPCDMFeasibility],
-    repo = Remotes.GitHub("JuliaHealth", "OMOPCDMFeasibility.jl"),
     authors = "Kosuri Lakshmi Indu <kosurilindu@gmail.com>, and contributors",
     sitename = "OMOPCDMFeasibility.jl",
     format = DocumenterVitepress.MarkdownVitepress(
         repo = "github.com/JuliaHealth/OMOPCDMFeasibility.jl",
         devurl = "dev",
         devbranch = "master",
-        deploy_url = "https://juliahealth.github.io/OMOPCDMFeasibility.jl",
     ),
     pages = [
         "Home" => "index.md",
