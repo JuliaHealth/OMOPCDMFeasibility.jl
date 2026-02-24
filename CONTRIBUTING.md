@@ -1,19 +1,19 @@
 # Contributing Guidelines
 
-Thanks for taking the time to contribute to NeuroAnalyzer.jl! ❤️
+Thanks for taking the time to contribute to OMOPCDMFeasibility.jl! ❤️
 
 We appreciate your interest in improving this project. Before you start contributing, please take a moment to review the following guidelines.
 
 
 ## Reporting Issues
 
-First off, we assume that you have read the available [Documentation](https://neuroanalyzer.org/docs/).
+First off, we assume that you have read the available [Documentation](http://juliahealth.org/OMOPCDMFeasibility.jl/).
 
-Before you report an issue, it is best to search for existing [Issues](https://github.com/JuliaHealth/NeuroAnalyzer.jl/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue.
+Before you report an issue, it is best to search for existing [Issues](https://github.com/JuliaHealth/OMOPCDMFeasibility.jl/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue.
 
 If you then still feel the need to report an issue, we recommend the following:
 
-- Open an [Issue](https://github.com/JuliaHealth/NeuroAnalyzer.jl/issues/new).
+- Open an [Issue](https://github.com/JuliaHealth/OMOPCDMFeasibility.jl/issues/new).
 - Provide as much context as you can about what you're running into.
 - Provide project and platform versions, depending on what seems relevant.
 
@@ -31,6 +31,6 @@ We will then take care of the issue as soon as possible.
 
 ## License
 
-By contributing to NeuroAnalyzer.jl, you agree that your contributions will be licensed under the [BSD 2-Clause License](https://github.com/JuliaHealth/NeuroAnalyzer.jl/blob/main/LICENSE).
+By contributing to NeuroAnalyzer.jl, you agree that your contributions will be licensed under the [MIT License](https://github.com/JuliaHealth/OMOPCDMFeasibility.jl/blob/master/LICENSE).
 
-Thank you for contributing to NeuroAnalyzer.jl! 🌟
+Thank you for contributing to OMOPCDMFeasibility.jl! 🌟
